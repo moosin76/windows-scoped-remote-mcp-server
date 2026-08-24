@@ -52,7 +52,13 @@ async function main() {
   if (providerRegistry.list().length > 0) {
     console.log(`[MCP Providers] Connecting ${providerRegistry.list().length} provider(s)...`);
     await providerRegistry.connectAll();
-    console.log(`[MCP Providers] Ready (${providerRegistry.listCachedTools().length} remote tools)`);
+    const statuses = providerRegistry.listStatuses();
+    const ready = statuses.filter((status) => status.connected);
+    const unavailable = statuses.filter((status) => !status.connected);
+    console.log(`[MCP Providers] Ready (${ready.length}/${statuses.length} provider(s), ${providerRegistry.listCachedTools().length} remote tools)`);
+    for (const status of unavailable) {
+      console.warn(`[MCP Provider Warning] ${status.id} is unavailable. Core WSR tools remain available.`);
+    }
   }
 
   const fileService = new FileService({

@@ -5,6 +5,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 export interface McpProvider {
   readonly id: string;
   readonly namespace: string;
+  readonly lastError?: string;
   connect(): Promise<void>;
   close(): Promise<void>;
   isConnected(): boolean;
@@ -23,13 +24,7 @@ export interface RemoteMcpProviderOptions {
   requestInit?: RequestInit;
 }
 
-/**
- * Generic MCP-over-Streamable-HTTP provider.
- *
- * This class deliberately does not know anything about Godot, Blender, or
- * another specific MCP implementation. The gateway can reuse it for any
- * compatible remote MCP server.
- */
+/** Generic MCP-over-Streamable-HTTP provider. */
 export class RemoteMcpProvider implements McpProvider {
   readonly id: string;
   readonly namespace: string;
@@ -38,6 +33,7 @@ export class RemoteMcpProvider implements McpProvider {
   private readonly client: Client;
   private transport?: StreamableHTTPClientTransport;
   private connected = false;
+  private _lastError?: string;
 
   constructor(options: RemoteMcpProviderOptions) {
     this.id = options.id;
@@ -48,6 +44,10 @@ export class RemoteMcpProvider implements McpProvider {
       version: options.clientVersion ?? "1.0.0",
     });
     this.requestInit = options.requestInit;
+  }
+
+  get lastError(): string | undefined {
+    return this._lastError;
   }
 
   private readonly requestInit?: RequestInit;
@@ -63,8 +63,11 @@ export class RemoteMcpProvider implements McpProvider {
       await this.client.connect(transport);
       this.transport = transport;
       this.connected = true;
+      this._lastError = undefined;
     } catch (error) {
       await transport.close().catch(() => undefined);
+      this.connected = false;
+      this._lastError = error instanceof Error ? error.message : String(error);
       throw error;
     }
   }
@@ -80,14 +83,24 @@ export class RemoteMcpProvider implements McpProvider {
   }
 
   async listTools(): Promise<readonly Tool[]> {
-    this.requireConnected();
-    const result = await this.client.listTools();
-    return result.tools;
+    await this.ensureConnected();
+    try {
+      const result = await this.client.listTools();
+      return result.tools;
+    } catch (error) {
+      this.markDisconnected(error);
+      throw this.unavailableError(error);
+    }
   }
 
   async callTool(name: string, args: Record<string, unknown> = {}): Promise<Awaited<ReturnType<Client["callTool"]>>> {
-    this.requireConnected();
-    return this.client.callTool({ name, arguments: args });
+    await this.ensureConnected();
+    try {
+      return await this.client.callTool({ name, arguments: args });
+    } catch (error) {
+      this.markDisconnected(error);
+      throw this.unavailableError(error);
+    }
   }
 
   namespacedToolName(remoteToolName: string): string {
@@ -102,12 +115,27 @@ export class RemoteMcpProvider implements McpProvider {
     return namespacedToolName.slice(prefix.length);
   }
 
-  private requireConnected(): void {
-    if (!this.connected) {
-      throw new Error(`MCP provider '${this.id}' is not connected`);
+  private async ensureConnected(): Promise<void> {
+    if (this.connected) return;
+    try {
+      await this.connect();
+    } catch {
+      throw this.unavailableError();
     }
   }
+
+  private markDisconnected(error: unknown): void {
+    this.connected = false;
+    this._lastError = error instanceof Error ? error.message : String(error);
+    this.transport = undefined;
+  }
+
+  private unavailableError(cause?: unknown): Error {
+    const detail = this._lastError ?? (cause instanceof Error ? cause.message : undefined);
+    return new Error(
+      `MCP provider '${this.id}' (${this.namespace}) is not connected. ` +
+      `Start the ${this.id} MCP server/editor and try again.` +
+      (detail ? ` Connection error: ${detail}` : ""),
+    );
+  }
 }
-
-
-

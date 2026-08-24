@@ -155,3 +155,15 @@ blender_*
 ## 문서 언어
 
 프로젝트의 개발 문서는 기본적으로 **한국어**로 작성한다. 코드의 식별자, API 이름, tool 이름, 환경 변수 이름은 원래 표기를 유지한다.
+
+## Remote MCP 연결 실패 처리 원칙
+
+Remote MCP Provider는 선택 기능으로 취급합니다.
+
+- 특정 Provider가 꺼져 있거나 연결에 실패해도 WSR Gateway 전체가 종료되어서는 안 됩니다.
+- 시작 시 Provider별로 독립적으로 연결을 시도하고 실패한 Provider는 warning으로 기록합니다.
+- 기본 Workspace/File/Process/Playwright 기능은 Provider 상태와 관계없이 계속 사용할 수 있어야 합니다.
+- `mcp_provider_status`를 통해 현재 Provider 연결 상태와 마지막 오류를 확인할 수 있어야 합니다.
+- 이미 등록된 Provider tool의 호출 중 연결이 끊어지면 사용자에게 어떤 Provider가 꺼져 있는지와 재시작해야 할 대상을 명확하게 반환합니다.
+- 가능하면 Provider 호출 시 재연결을 한 번 시도한 후 실패를 사용자 친화적인 MCP tool error로 반환합니다.
+- 새로운 Provider를 추가할 때도 이 원칙을 유지합니다.

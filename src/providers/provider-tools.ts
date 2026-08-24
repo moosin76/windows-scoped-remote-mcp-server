@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+﻿import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { jsonSchemaObjectToZodRawShape } from "zod-from-json-schema";
 import type { ProviderRegistry, NamespacedTool } from "./provider-registry.js";
@@ -16,6 +16,22 @@ export function registerProviderTools(
   tools: readonly NamespacedTool[],
 ): void {
   for (const entry of tools) registerProviderTool(server, registry, entry);
+}
+
+/** Always expose provider health so an unavailable optional MCP is diagnosable. */
+export function registerProviderStatusTool(server: McpServer, registry: ProviderRegistry): void {
+  server.registerTool(
+    "mcp_provider_status",
+    {
+      description: "Show the connection status of configured remote MCP providers. Use this when a provider-specific tool is unavailable.",
+    },
+    async () => ({
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify(registry.listStatuses(), null, 2),
+      }],
+    }),
+  );
 }
 
 function registerProviderTool(
@@ -39,7 +55,17 @@ function registerProviderTool(
     },
     async (args: Record<string, unknown>) => {
       const { provider, remoteName } = registry.resolve(tool.name);
-      return provider.callTool(remoteName, args);
+      try {
+        return await provider.callTool(remoteName, args);
+      } catch (error) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: error instanceof Error ? error.message : String(error),
+          }],
+          isError: true,
+        };
+      }
     },
   );
 }

@@ -3,7 +3,7 @@ import { ProviderRegistry } from "../src/providers/provider-registry.js";
 import type { McpProvider } from "../src/providers/mcp-provider.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
-function fakeProvider(id: string, namespace: string, tools: string[]): McpProvider {
+function fakeProvider(id: string, namespace: string, tools: string[]): McpProvider & { connect: () => Promise<void>; isConnected: () => boolean; lastError?: string } {
   const toolList: Tool[] = tools.map((name) => ({ name, description: `${name} test tool`, inputSchema: { type: "object" } }));
   return {
     id,
@@ -36,6 +36,23 @@ describe("ProviderRegistry", () => {
     registry.add(fakeProvider("godot", "godot", ["get_scene"]));
     expect(() => registry.add(fakeProvider("godot", "other", []))).toThrow("already registered");
     expect(() => registry.add(fakeProvider("blender", "godot", []))).toThrow("namespace");
+  });
+
+  it("keeps the registry usable when a provider is unavailable", async () => {
+    const registry = new ProviderRegistry();
+    const unavailable = fakeProvider("godot", "godot", []);
+    unavailable.connect = async () => { throw new Error("ECONNREFUSED"); };
+    unavailable.isConnected = () => false;
+    unavailable.lastError = undefined;
+    registry.add(unavailable);
+
+    await expect(registry.connectAll()).resolves.toBeUndefined();
+    expect(registry.listStatuses()).toEqual([{
+      id: "godot",
+      namespace: "godot",
+      connected: false,
+      toolCount: 0,
+    }]);
   });
 
   it("resolves a namespaced call to its provider", () => {

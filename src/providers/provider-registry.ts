@@ -1,10 +1,18 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+﻿import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { McpProvider } from "./mcp-provider.js";
 
 export interface NamespacedTool {
   readonly providerId: string;
   readonly remoteName: string;
   readonly tool: Tool;
+}
+
+export interface ProviderStatus {
+  id: string;
+  namespace: string;
+  connected: boolean;
+  toolCount: number;
+  lastError?: string;
 }
 
 /** Registry for remote MCP providers and their namespaced tools. */
@@ -39,10 +47,15 @@ export class ProviderRegistry {
     return [...this.providers.values()];
   }
 
+  /** Connect providers independently. One unavailable provider must not stop the gateway. */
   async connectAll(): Promise<void> {
     for (const provider of this.providers.values()) {
-      await provider.connect();
-      await this.refresh(provider.id);
+      try {
+        await provider.connect();
+        await this.refresh(provider.id);
+      } catch (error) {
+        console.warn(`[MCP Provider] '${provider.id}' unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 
@@ -82,6 +95,17 @@ export class ProviderRegistry {
   listCachedTools(): readonly NamespacedTool[] {
     return [...this.toolSnapshots.values()].flat();
   }
+
+  listStatuses(): readonly ProviderStatus[] {
+    return this.list().map((provider) => ({
+      id: provider.id,
+      namespace: provider.namespace,
+      connected: provider.isConnected(),
+      toolCount: this.toolSnapshots.get(provider.id)?.length ?? 0,
+      ...(provider.lastError ? { lastError: provider.lastError } : {}),
+    }));
+  }
+
   resolve(namespacedName: string): { provider: McpProvider; remoteName: string } {
     for (const provider of this.providers.values()) {
       if (namespacedName.startsWith(`${provider.namespace}_`)) {

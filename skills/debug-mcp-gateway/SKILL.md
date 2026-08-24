@@ -87,3 +87,15 @@ Transport
 ```
 
 순서로 좁힌다.
+
+## Provider가 꺼진 경우
+
+WSR 전체가 종료되는지부터 확인하지 말고 다음 순서로 확인합니다.
+
+1. `mcp_provider_status` 호출
+2. 해당 Provider의 `connected` 상태 확인
+3. `lastError` 확인
+4. Provider 프로그램/Editor가 실행 중인지 확인
+5. Provider를 다시 시작한 뒤 필요한 경우 WSR을 재시작하거나 도구 목록을 새로 고침
+
+Provider 연결 실패는 WSR Gateway 전체 장애로 취급하지 않습니다.

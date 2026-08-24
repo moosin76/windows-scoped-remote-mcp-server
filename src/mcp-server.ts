@@ -10,7 +10,7 @@ import { registerBrowserTools } from "./browser-tools.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
-import { registerProviderTools } from "./providers/provider-tools.js";
+import { registerProviderStatusTool, registerProviderTools } from "./providers/provider-tools.js";
 
 export function createMcpServer(
   config: AppConfig,
@@ -41,6 +41,7 @@ export function createMcpServer(
   registerExecTools(server, config, processManager, fileService);
   registerFileTools(server, config, fileService);
   if (providerRegistry) {
+    registerProviderStatusTool(server, providerRegistry);
     registerProviderTools(server, providerRegistry, providerRegistry.listCachedTools());
   }
   return server;
