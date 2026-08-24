@@ -6,6 +6,14 @@ ChatGPT, Claude 등 MCP를 지원하는 LLM 클라이언트와 연결하여 실�
 
 또한 Godot, Blender 등 별도의 Remote MCP를 **Provider**로 연결할 수 있어 하나의 Gateway에서 다양한 개발 도구를 함께 사용할 수 있습니다.
 
+### ❤️ 프로젝트 후원
+
+WSR이 유용했다면 GitHub Sponsors를 통해 프로젝트를 후원할 수 있습니다.
+
+**[💖 GitHub Sponsors로 후원하기](https://github.com/sponsors/moosin76)**
+
+후원은 WSR의 유지보수와 새로운 MCP Provider 및 기능 개발에 사용됩니다.
+
 ---
 
 ## 주요 특징
