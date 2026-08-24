@@ -20,6 +20,8 @@ ChatGPT / Claude 등 MCP Client
 
 새 MCP마다 별도의 HTTP client나 Gateway 구현을 만들지 말고 `RemoteMcpProvider`를 재사용한다.
 
+현재 SDK v2에서는 outbound client를 `@modelcontextprotocol/client`에서 가져온다. Provider가 legacy-only인지 modern discovery를 지원하는지 확인하고 negotiation 정책을 결정한다. 기존 Provider의 정책을 바꿀 때는 Godot처럼 2025 `initialize`만 지원하는 서버의 fallback도 함께 회귀 테스트한다.
+
 ## 1. 연결 정보 확인
 
 먼저 MCP의 공식 연결 방법을 확인한다.
@@ -210,6 +212,7 @@ Provider가 꺼진 상태에서도 Core WSR 기능이 유지되는지 확인한�
 11. Provider 재실행
 12. Scheduler가 자동 복구하는지 확인
 13. MCP tool 목록이 변경되었을 때 Registry가 갱신되는지 확인
+14. WSR inbound `server/discover`와 legacy `initialize`가 모두 계속 성공하는지 확인
 
 ## 11. 문서화
 

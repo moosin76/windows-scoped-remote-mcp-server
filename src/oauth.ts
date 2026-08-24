@@ -1,25 +1,24 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-
-import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
+import type {
+  AuthInfo,
+  OAuthClientInformationFull,
+  OAuthTokenRevocationRequest,
+  OAuthTokens,
+} from "@modelcontextprotocol/server";
 import {
   InvalidClientMetadataError,
   InvalidGrantError,
   InvalidScopeError,
   InvalidTargetError,
   UnauthorizedClientError,
-} from "@modelcontextprotocol/sdk/server/auth/errors.js";
+} from "@modelcontextprotocol/server-legacy/auth";
 import type {
+  OAuthRegisteredClientsStore,
   AuthorizationParams,
   OAuthServerProvider,
-} from "@modelcontextprotocol/sdk/server/auth/provider.js";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type {
-  OAuthClientInformationFull,
-  OAuthTokenRevocationRequest,
-  OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/server-legacy/auth";
 import type { Request, Response } from "express";
 
 import { tokensEqual } from "./auth.js";
@@ -77,7 +76,10 @@ function clientMetadataProblem(value: unknown): string | undefined {
     return "Client metadata must be an object";
   }
   const client = value as Partial<OAuthClientInformationFull>;
-  if (!Array.isArray(client.redirect_uris) || client.redirect_uris.length === 0) {
+  if (
+    !Array.isArray(client.redirect_uris) ||
+    client.redirect_uris.length === 0
+  ) {
     return "At least one redirect_uri is required";
   }
   for (const redirectUri of client.redirect_uris) {
@@ -91,7 +93,10 @@ function clientMetadataProblem(value: unknown): string | undefined {
       return "Every redirect_uri must be an absolute URL";
     }
     const isLoopback = LOOPBACK_REDIRECT_HOSTS.has(parsed.hostname);
-    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && isLoopback)) {
+    if (
+      parsed.protocol !== "https:" &&
+      !(parsed.protocol === "http:" && isLoopback)
+    ) {
       return "Every redirect_uri must use HTTPS or HTTP on a loopback host";
     }
     if (parsed.hash || parsed.username || parsed.password) {
@@ -129,7 +134,9 @@ function clientMetadataProblem(value: unknown): string | undefined {
   if (
     client.response_types !== undefined &&
     (!Array.isArray(client.response_types) ||
-      !client.response_types.every((responseType) => typeof responseType === "string"))
+      !client.response_types.every(
+        (responseType) => typeof responseType === "string",
+      ))
   ) {
     return "response_types must be an array of strings";
   }
@@ -142,7 +149,11 @@ function clientMetadataProblem(value: unknown): string | undefined {
     return "scope must be a string";
   }
   const scopes = client.scope?.split(/\s+/).filter(Boolean) ?? [];
-  if (!scopes.every((scope) => OAUTH_SCOPES.includes(scope as (typeof OAUTH_SCOPES)[number]))) {
+  if (
+    !scopes.every((scope) =>
+      OAUTH_SCOPES.includes(scope as (typeof OAUTH_SCOPES)[number]),
+    )
+  ) {
     return "Only the mcp:tools scope is supported";
   }
   return undefined;
@@ -154,7 +165,9 @@ function isStoredToken(value: unknown): value is StoredToken {
   }
   const token = value as Partial<StoredToken>;
   return (
-    (token.type === "access" || token.type === "refresh" || token.type === "used_refresh") &&
+    (token.type === "access" ||
+      token.type === "refresh" ||
+      token.type === "used_refresh") &&
     typeof token.clientId === "string" &&
     Array.isArray(token.scopes) &&
     token.scopes.every((scope) => typeof scope === "string") &&
@@ -220,10 +233,14 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
     await mkdir(directory, { recursive: true });
     const temporaryFile = `${this.stateFile}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
     try {
-      await writeFile(temporaryFile, `${JSON.stringify(this.state, null, 2)}\n`, {
-        encoding: "utf8",
-        flag: "wx",
-      });
+      await writeFile(
+        temporaryFile,
+        `${JSON.stringify(this.state, null, 2)}\n`,
+        {
+          encoding: "utf8",
+          flag: "wx",
+        },
+      );
       await rename(temporaryFile, this.stateFile);
     } catch (error) {
       await unlink(temporaryFile).catch(() => undefined);
@@ -252,7 +269,9 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
     return pending;
   }
 
-  async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
+  async getClient(
+    clientId: string,
+  ): Promise<OAuthClientInformationFull | undefined> {
     await this.ensureLoaded();
     await this.mutationQueue;
     let client = this.state.clients[clientId];
@@ -279,7 +298,10 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
   }
 
   async registerClient(
-    client: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">,
+    client: Omit<
+      OAuthClientInformationFull,
+      "client_id" | "client_id_issued_at"
+    >,
   ): Promise<OAuthClientInformationFull> {
     const supplied = client as Partial<OAuthClientInformationFull>;
     const registered: OAuthClientInformationFull = {
@@ -289,7 +311,8 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
       grant_types: client.grant_types ?? ["authorization_code"],
       response_types: client.response_types ?? ["code"],
       client_id: supplied.client_id || randomUUID(),
-      client_id_issued_at: supplied.client_id_issued_at || Math.floor(Date.now() / 1000),
+      client_id_issued_at:
+        supplied.client_id_issued_at || Math.floor(Date.now() / 1000),
     };
     const problem = clientMetadataProblem(registered);
     if (problem) {
@@ -356,7 +379,10 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
     return tokens;
   }
 
-  private revokeGrantWithoutPersist(grantId: string, preserveReplayEvidence = false): void {
+  private revokeGrantWithoutPersist(
+    grantId: string,
+    preserveReplayEvidence = false,
+  ): void {
     for (const [hash, token] of Object.entries(this.state.tokens)) {
       if (
         token.grantId === grantId &&
@@ -399,7 +425,12 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
       this.state.tokens[hash] = { ...current, type: "used_refresh", grantId };
       return {
         status: "ok",
-        tokens: this.issueTokenPairWithoutPersist(clientId, scopes, resource, grantId),
+        tokens: this.issueTokenPairWithoutPersist(
+          clientId,
+          scopes,
+          resource,
+          grantId,
+        ),
       };
     });
   }
@@ -431,7 +462,9 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
     }
 
     return this.mutate(() => {
-      const clientId = Object.keys(this.state.clients)[0] || "944bf9d931091fe77acf86b37677bc41";
+      const clientId =
+        Object.keys(this.state.clients)[0] ||
+        "944bf9d931091fe77acf86b37677bc41";
       if (!this.state.clients[clientId]) {
         this.state.clients[clientId] = {
           client_id: clientId,
@@ -556,12 +589,17 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
   readonly clientsStore: PersistentOAuthStore;
   readonly issuerUrl: URL;
   readonly resourceUrl: URL;
-  private readonly authorizationCodes = new Map<string, AuthorizationCodeRecord>();
+  private readonly authorizationCodes = new Map<
+    string,
+    AuthorizationCodeRecord
+  >();
 
   constructor(private readonly config: AppConfig) {
     const pubUrl = config.publicUrl || `http://localhost:${config.port}`;
     this.issuerUrl = new URL(config.oauthIssuerUrl || pubUrl);
-    this.resourceUrl = new URL(config.oauthResourceUrl || `${pubUrl.replace(/\/$/, "")}/mcp`);
+    this.resourceUrl = new URL(
+      config.oauthResourceUrl || `${pubUrl.replace(/\/$/, "")}/mcp`,
+    );
     this.clientsStore = new PersistentOAuthStore(
       config.oauthStateFile,
       config.oauthAccessTokenTtlSeconds,
@@ -580,8 +618,13 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
   }
 
   private validateScopes(scopes: string[] | undefined): string[] {
-    const requested = scopes && scopes.length > 0 ? [...new Set(scopes)] : [...OAUTH_SCOPES];
-    if (!requested.every((scope) => OAUTH_SCOPES.includes(scope as (typeof OAUTH_SCOPES)[number]))) {
+    const requested =
+      scopes && scopes.length > 0 ? [...new Set(scopes)] : [...OAUTH_SCOPES];
+    if (
+      !requested.every((scope) =>
+        OAUTH_SCOPES.includes(scope as (typeof OAUTH_SCOPES)[number]),
+      )
+    ) {
       throw new InvalidScopeError("Only the mcp:tools scope is supported");
     }
     return requested;
@@ -601,8 +644,14 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
     params: AuthorizationParams,
     response: Response,
   ): Promise<void> {
-    if (!(client.grant_types ?? ["authorization_code"]).includes("authorization_code")) {
-      throw new UnauthorizedClientError("Client is not authorized for authorization_code");
+    if (
+      !(client.grant_types ?? ["authorization_code"]).includes(
+        "authorization_code",
+      )
+    ) {
+      throw new UnauthorizedClientError(
+        "Client is not authorized for authorization_code",
+      );
     }
     const resource = this.validateResource(params.resource);
     const scopes = this.validateScopes(params.scopes);
@@ -612,13 +661,21 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
         ? request.body.access_key
         : undefined;
 
-    const approvalKey = (this.config.oauthApprovalKey || this.config.authToken)?.trim();
+    const approvalKey = (
+      this.config.oauthApprovalKey || this.config.authToken
+    )?.trim();
 
     if (!accessKey || !approvalKey || !tokensEqual(accessKey, approvalKey)) {
       response
         .status(accessKey ? 401 : 200)
         .type("html")
-        .send(renderAuthorizationPage(client, { ...params, scopes, resource: new URL(resource) }, Boolean(accessKey)));
+        .send(
+          renderAuthorizationPage(
+            client,
+            { ...params, scopes, resource: new URL(resource) },
+            Boolean(accessKey),
+          ),
+        );
       return;
     }
 
@@ -630,7 +687,8 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
       redirectUri: params.redirectUri,
       resource,
       scopes,
-      expiresAt: Date.now() + this.config.oauthAuthorizationCodeTtlSeconds * 1000,
+      expiresAt:
+        Date.now() + this.config.oauthAuthorizationCodeTtlSeconds * 1000,
     });
 
     const target = new URL(params.redirectUri);
@@ -681,7 +739,10 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
         client.grant_types?.includes("refresh_token") ?? false,
       );
     } catch (error) {
-      if (record.expiresAt > Date.now() && !this.authorizationCodes.has(authorizationCode)) {
+      if (
+        record.expiresAt > Date.now() &&
+        !this.authorizationCodes.has(authorizationCode)
+      ) {
         this.authorizationCodes.set(authorizationCode, record);
       }
       throw error;
@@ -695,7 +756,9 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
     resource?: URL,
   ): Promise<OAuthTokens> {
     if (!client.grant_types?.includes("refresh_token")) {
-      throw new UnauthorizedClientError("Client is not authorized for refresh_token");
+      throw new UnauthorizedClientError(
+        "Client is not authorized for refresh_token",
+      );
     }
     const resourceValue = this.validateResource(resource);
     const requestedScopes = scopes ? this.validateScopes(scopes) : undefined;

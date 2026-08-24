@@ -28,7 +28,24 @@ http://localhost:12000/mcp
 
 ### 3. tools/list
 
-ChatGPT의 '도구 목록 새로고침'이 실패하면 먼저 `tools/list` 단계의 응답을 검사한다.
+ChatGPT의 '도구 목록 새로고침'이 실패하면 `server/discover`를 먼저 확인한 뒤 `tools/list` 단계의 응답을 검사한다.
+
+최신 클라이언트는 다음 순서로 시작할 수 있다.
+
+```text
+server/discover (2026-07-28)
+  ├─ 성공 → modern per-request flow
+  └─ 미지원 → legacy initialize fallback
+```
+
+`server/discover`가 400이면 다음을 확인한다.
+
+- `@modelcontextprotocol/server` v2와 `createMcpHandler`를 사용 중인가?
+- `MCP-Protocol-Version`, `Mcp-Method`, 필요한 경우 `Mcp-Name` header가 body와 일치하는가?
+- 요청 `params._meta`에 protocol version/client info/client capabilities가 있는가?
+- Express body parser가 소비한 body를 Node adapter에 전달하는가?
+
+수동 `server/discover` handler로 우회하지 않는다. SDK의 modern handler가 capability와 server identity를 생성하도록 한다.
 
 주요 의심 항목:
 

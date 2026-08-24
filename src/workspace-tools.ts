@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { runTool } from "./tool-result.js";
 import type { WorkspaceManager } from "./workspace.js";
@@ -13,7 +13,7 @@ export function registerWorkspaceTools(
       title: "List Workspaces",
       description:
         "List all registered multi-root workspaces, their aliases, directory paths, and which workspace is currently active.",
-      inputSchema: {},
+      inputSchema: z.object({}),
     },
     async () =>
       runTool(async () => {
@@ -34,7 +34,7 @@ export function registerWorkspaceTools(
       title: "Get Active Workspace",
       description:
         "Get information about the currently active workspace, including alias name, absolute directory path, and sandbox status.",
-      inputSchema: {},
+      inputSchema: z.object({}),
     },
     async () =>
       runTool(async () => {
@@ -54,14 +54,14 @@ export function registerWorkspaceTools(
       title: "Switch Active Workspace",
       description:
         "Switch the active workspace by alias name or path. Subsequent relative file operations and shell commands will execute in this workspace.",
-      inputSchema: {
+      inputSchema: z.object({
         name: z
           .string()
           .min(1)
           .describe(
             "Workspace alias name (e.g. 'test', 'ether', 'server') or absolute directory path to switch to.",
           ),
-      },
+      }),
     },
     async ({ name }) =>
       runTool(async () => {

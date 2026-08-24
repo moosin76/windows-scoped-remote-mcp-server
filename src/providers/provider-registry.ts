@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 import type { McpProvider } from "./mcp-provider.js";
 
 export interface NamespacedTool {
@@ -26,8 +26,14 @@ export class ProviderRegistry {
     if (this.providers.has(provider.id)) {
       throw new Error(`MCP provider '${provider.id}' is already registered`);
     }
-    if ([...this.providers.values()].some((item) => item.namespace === provider.namespace)) {
-      throw new Error(`MCP namespace '${provider.namespace}' is already registered`);
+    if (
+      [...this.providers.values()].some(
+        (item) => item.namespace === provider.namespace,
+      )
+    ) {
+      throw new Error(
+        `MCP namespace '${provider.namespace}' is already registered`,
+      );
     }
     this.providers.set(provider.id, provider);
   }
@@ -56,7 +62,9 @@ export class ProviderRegistry {
         await provider.connect();
         await this.refresh(provider.id);
       } catch (error) {
-        console.warn(`[MCP Provider] '${provider.id}' unavailable: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `[MCP Provider] '${provider.id}' unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }
@@ -68,21 +76,28 @@ export class ProviderRegistry {
   async discoverAvailable(): Promise<void> {
     const now = Date.now();
     for (const provider of this.providers.values()) {
-      if (provider.isConnected() && this.toolSnapshots.has(provider.id)) continue;
+      if (provider.isConnected() && this.toolSnapshots.has(provider.id))
+        continue;
       const lastAttempt = this.lastDiscoveryAttempt.get(provider.id) ?? 0;
       if (now - lastAttempt < this.discoveryRetryMs) continue;
       this.lastDiscoveryAttempt.set(provider.id, now);
       try {
         await provider.connect();
         await this.refresh(provider.id);
-        console.log(`[MCP Provider] '${provider.id}' discovered (${this.toolSnapshots.get(provider.id)?.length ?? 0} tools)`);
+        console.log(
+          `[MCP Provider] '${provider.id}' discovered (${this.toolSnapshots.get(provider.id)?.length ?? 0} tools)`,
+        );
       } catch (error) {
-        console.warn(`[MCP Provider] '${provider.id}' discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `[MCP Provider] '${provider.id}' discovery failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }
   async closeAll(): Promise<void> {
-    await Promise.all([...this.providers.values()].map((provider) => provider.close()));
+    await Promise.all(
+      [...this.providers.values()].map((provider) => provider.close()),
+    );
   }
 
   async refresh(id: string): Promise<readonly NamespacedTool[]> {
@@ -94,9 +109,14 @@ export class ProviderRegistry {
     for (const tool of await provider.listTools()) {
       const remoteName = tool.name;
       const name = provider.namespacedToolName(remoteName);
-      if (names.has(name)) throw new Error(`Duplicate namespaced MCP tool '${name}'`);
+      if (names.has(name))
+        throw new Error(`Duplicate namespaced MCP tool '${name}'`);
       names.add(name);
-      result.push({ providerId: provider.id, remoteName, tool: { ...tool, name } });
+      result.push({
+        providerId: provider.id,
+        remoteName,
+        tool: { ...tool, name },
+      });
     }
 
     const snapshot = Object.freeze(result.slice());
@@ -128,10 +148,16 @@ export class ProviderRegistry {
     }));
   }
 
-  resolve(namespacedName: string): { provider: McpProvider; remoteName: string } {
+  resolve(namespacedName: string): {
+    provider: McpProvider;
+    remoteName: string;
+  } {
     for (const provider of this.providers.values()) {
       if (namespacedName.startsWith(`${provider.namespace}_`)) {
-        return { provider, remoteName: provider.remoteToolName(namespacedName) };
+        return {
+          provider,
+          remoteName: provider.remoteToolName(namespacedName),
+        };
       }
     }
     throw new Error(`No MCP provider owns tool '${namespacedName}'`);

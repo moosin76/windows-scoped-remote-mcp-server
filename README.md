@@ -27,6 +27,7 @@ WSR이 유용했다면 GitHub Sponsors를 통해 프로젝트를 후원할 수 �
 - **Provider 장애 격리** — 하나의 MCP가 꺼져 있어도 WSR Core와 다른 Provider는 계속 사용할 수 있습니다.
 - **Provider Scheduler** — MCP의 연결 상태와 `tools/list`를 주기적으로 확인하고 자동 재연결 및 Tool Registry 갱신을 수행합니다.
 - **OAuth 2.1 / Cloudflare Tunnel 지원** — 원격 MCP 클라이언트와 안전하게 연결할 수 있는 구성을 제공합니다.
+- **MCP 2026-07-28 + legacy 호환** — `server/discover` 기반 최신 stateless 요청과 2025 `initialize` 흐름을 같은 `/mcp` endpoint에서 지원합니다.
 
 ---
 
@@ -55,6 +56,14 @@ WSR이 유용했다면 GitHub Sponsors를 통해 프로젝트를 후원할 수 �
 
 WSR 자체는 Gateway 역할을 하고, 외부 MCP는 `RemoteMcpProvider`를 통해 연결합니다.
 
+HTTP MCP 계층은 공식 TypeScript SDK v2의 `createMcpHandler`를 사용합니다. `2026-07-28` 클라이언트에는 `server/discover`와 요청별 `_meta` envelope를 제공하고, 기존 클라이언트에는 같은 tool 정의로 2025-era stateless `initialize` fallback을 제공합니다.
+
+```text
+POST /mcp
+  ├─ MCP 2026-07-28 → server/discover / per-request envelope
+  └─ MCP 2025-era  → initialize / notifications/initialized
+```
+
 ---
 
 ## Remote MCP Provider
@@ -73,11 +82,11 @@ WSR
 
 각 Provider에는 namespace를 사용합니다.
 
-| MCP | Namespace 예시 |
-| :--- | :--- |
-| Godot | `godot_*` |
-| Blender | `blender_*` |
-| Browser | `browser_*` |
+| MCP        | Namespace 예시 |
+| :--------- | :------------- |
+| Godot      | `godot_*`      |
+| Blender    | `blender_*`    |
+| Browser    | `browser_*`    |
 | 새로운 MCP | `<provider>_*` |
 
 예를 들어 Blender MCP의 `get_scene`은 WSR에서 `blender_get_scene`으로 노출됩니다.
@@ -250,19 +259,19 @@ start.bat
 
 ## 주요 환경변수
 
-| 변수 | 기본값 | 설명 |
-| :--- | :--- | :--- |
-| `MCP_PORT` | `12000` | WSR HTTP 서버 포트 |
-| `MCP_WORKSPACE_ROOT` | 현재 경로 | 활성 Workspace |
-| `MCP_WORKSPACE_ROOTS` | `MCP_WORKSPACE_ROOT` | Multi-Workspace 목록 |
-| `MCP_AUTH_TOKEN` | 없음 | 인증용 토큰 |
-| `MCP_PUBLIC_URL` | 없음 | 공개 MCP URL |
-| `CLOUDFLARE_TUNNEL_TOKEN` | 없음 | Cloudflare Tunnel 토큰 |
-| `MCP_BROWSER_HEADLESS` | `false` | Playwright Headless 여부 |
-| `MCP_PROVIDER_HEALTH_INTERVAL_MS` | `10000` | 연결된 Provider 검사 주기(ms) |
-| `MCP_PROVIDER_RETRY_INTERVAL_MS` | `5000` | 연결되지 않은 Provider 재연결 주기(ms) |
-| `MCP_GODOT_ENABLED` | `false` | Godot MCP Provider 활성화 |
-| `MCP_GODOT_URL` | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint |
+| 변수                              | 기본값                      | 설명                                   |
+| :-------------------------------- | :-------------------------- | :------------------------------------- |
+| `MCP_PORT`                        | `12000`                     | WSR HTTP 서버 포트                     |
+| `MCP_WORKSPACE_ROOT`              | 현재 경로                   | 활성 Workspace                         |
+| `MCP_WORKSPACE_ROOTS`             | `MCP_WORKSPACE_ROOT`        | Multi-Workspace 목록                   |
+| `MCP_AUTH_TOKEN`                  | 없음                        | 인증용 토큰                            |
+| `MCP_PUBLIC_URL`                  | 없음                        | 공개 MCP URL                           |
+| `CLOUDFLARE_TUNNEL_TOKEN`         | 없음                        | Cloudflare Tunnel 토큰                 |
+| `MCP_BROWSER_HEADLESS`            | `false`                     | Playwright Headless 여부               |
+| `MCP_PROVIDER_HEALTH_INTERVAL_MS` | `10000`                     | 연결된 Provider 검사 주기(ms)          |
+| `MCP_PROVIDER_RETRY_INTERVAL_MS`  | `5000`                      | 연결되지 않은 Provider 재연결 주기(ms) |
+| `MCP_GODOT_ENABLED`               | `false`                     | Godot MCP Provider 활성화              |
+| `MCP_GODOT_URL`                   | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint                     |
 
 민감한 토큰과 비밀번호는 `.env`에만 저장하고 Git에 커밋하지 마세요.
 
@@ -275,6 +284,15 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+MCP SDK는 v2 split package 구조를 사용합니다.
+
+- 서버 및 `createMcpHandler`: `@modelcontextprotocol/server`
+- Node/Express adapter: `@modelcontextprotocol/node`
+- Remote Provider client: `@modelcontextprotocol/client`
+- 기존 내장 OAuth Authorization Server 호환 계층: `@modelcontextprotocol/server-legacy/auth`
+
+마지막 항목은 공식 v1→v2 마이그레이션 브리지이며 deprecated 상태입니다. discovery 복구와 기존 OAuth 동작 보존을 위해 유지하되, 장기적으로는 전용 OAuth/IdP 라이브러리로 분리해야 합니다.
 
 새 MCP Provider를 추가할 때는 다음 문서를 먼저 읽는 것을 권장합니다.
 

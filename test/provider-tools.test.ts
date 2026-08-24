@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 import { ProviderRegistry } from "../src/providers/provider-registry.js";
 import { registerProviderTools } from "../src/providers/provider-tools.js";
 import type { McpProvider } from "../src/providers/mcp-provider.js";
@@ -49,7 +49,11 @@ describe("registerProviderTools", () => {
 
     const registered: Registered[] = [];
     const server = {
-      registerTool(name: string, config: Record<string, unknown>, callback: Registered["callback"]) {
+      registerTool(
+        name: string,
+        config: Record<string, unknown>,
+        callback: Registered["callback"],
+      ) {
         registered.push({ name, config, callback });
         return {};
       },
@@ -61,7 +65,10 @@ describe("registerProviderTools", () => {
     expect(registered[0].name).toBe("fake_echo");
     expect(registered[0].config.description).toBe("Echo a message");
     expect(registered[0].config.inputSchema).toBeTruthy();
-    expect((registered[0].config.inputSchema as { message?: { _zod?: unknown } }).message?._zod).toBeTruthy();
+    expect(
+      (registered[0].config.inputSchema as { message?: { _zod?: unknown } })
+        .message?._zod,
+    ).toBeTruthy();
 
     await registered[0].callback({ message: "hello" });
     expect(callTool).toHaveBeenCalledWith("echo", { message: "hello" });
@@ -76,7 +83,11 @@ describe("registerProviderTools", () => {
 
     const registered: Registered[] = [];
     const server = {
-      registerTool(name: string, config: Record<string, unknown>, callback: Registered["callback"]) {
+      registerTool(
+        name: string,
+        config: Record<string, unknown>,
+        callback: Registered["callback"],
+      ) {
         registered.push({ name, config, callback });
         return {};
       },
@@ -87,4 +98,3 @@ describe("registerProviderTools", () => {
     expect(registered[0].name).toBe("fake_ping");
   });
 });
-

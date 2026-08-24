@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import type { AppConfig } from "./config.js";
 import { FileService } from "./file-service.js";
 import { ProcessManager } from "./process-manager.js";
@@ -10,7 +10,10 @@ import { registerBrowserTools } from "./browser-tools.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
-import { registerProviderStatusTool, registerProviderTools } from "./providers/provider-tools.js";
+import {
+  registerProviderStatusTool,
+  registerProviderTools,
+} from "./providers/provider-tools.js";
 
 export async function createMcpServer(
   config: AppConfig,
@@ -43,7 +46,11 @@ export async function createMcpServer(
   if (providerRegistry) {
     await providerRegistry.discoverAvailable();
     registerProviderStatusTool(server, providerRegistry);
-    registerProviderTools(server, providerRegistry, providerRegistry.listCachedTools());
+    registerProviderTools(
+      server,
+      providerRegistry,
+      providerRegistry.listCachedTools(),
+    );
   }
   return server;
 }

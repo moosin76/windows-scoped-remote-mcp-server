@@ -15,7 +15,7 @@
 
 ## 현재 기준점
 
-현재 Git 기준 커밋은 `f0b082c`이며 Remote MCP Provider Gateway가 실제 Godot MCP와 연결되어 검증되었다.
+Remote MCP Provider Gateway는 실제 Godot MCP와 연결되어 검증되었다. 작업 시작 시 문서에 기록된 과거 커밋을 기준으로 추정하지 말고 `git status`와 `git log -1`로 현재 기준점을 확인한다.
 
 검증된 흐름:
 
@@ -36,6 +36,15 @@ Godot Editor
 ```
 
 Godot에서는 MCP를 통해 테스트 Scene을 생성/저장하는 것까지 확인했다.
+
+현재 MCP 계층은 공식 TypeScript SDK v2 split package 구조를 사용한다.
+
+- inbound server: `@modelcontextprotocol/server`
+- Node HTTP adapter: `@modelcontextprotocol/node`
+- outbound Provider client: `@modelcontextprotocol/client`
+- legacy OAuth Authorization Server bridge: `@modelcontextprotocol/server-legacy/auth`
+
+HTTP endpoint는 `createMcpHandler`의 modern `2026-07-28` 경로와 기본 stateless legacy fallback을 함께 사용한다. `server/discover`를 application code에서 직접 구현하거나 응답을 수동 조립하지 않는다.
 
 ## 핵심 설계 원칙
 
@@ -125,11 +134,12 @@ blender_*
 5. `npm run typecheck` 또는 프로젝트에 정의된 typecheck 실행
 6. `npm test`
 7. 실제 MCP 서버가 필요한 경우 통합 테스트
-8. 서버 재시작
-9. ChatGPT의 MCP 도구 새로고침 확인
-10. 실제 읽기 tool 호출
-11. 실제 쓰기/변경 tool 호출
-12. Git checkpoint commit
+8. `server/discover` (`2026-07-28`)와 legacy `initialize` 직접 테스트
+9. 서버 재시작
+10. ChatGPT의 MCP 도구 새로고침 확인
+11. 실제 읽기 tool 호출
+12. 실제 쓰기/변경 tool 호출
+13. Git checkpoint commit
 
 ## MCP Provider 추가 시 반드시 확인할 것
 

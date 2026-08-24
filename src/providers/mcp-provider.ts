@@ -1,6 +1,8 @@
-﻿import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+﻿import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
+import type { Tool } from "@modelcontextprotocol/client";
 
 export interface McpProvider {
   readonly id: string;
@@ -10,7 +12,10 @@ export interface McpProvider {
   close(): Promise<void>;
   isConnected(): boolean;
   listTools(): Promise<readonly Tool[]>;
-  callTool(name: string, args?: Record<string, unknown>): Promise<Awaited<ReturnType<Client["callTool"]>>>;
+  callTool(
+    name: string,
+    args?: Record<string, unknown>,
+  ): Promise<Awaited<ReturnType<Client["callTool"]>>>;
   namespacedToolName(remoteToolName: string): string;
   remoteToolName(namespacedToolName: string): string;
 }
@@ -65,8 +70,13 @@ export class RemoteMcpProvider implements McpProvider {
   }
 
   private async createConnection(): Promise<void> {
-    const client = new Client({ name: this.clientName, version: this.clientVersion });
-    const transport = new StreamableHTTPClientTransport(this.url, { requestInit: this.requestInit });
+    const client = new Client({
+      name: this.clientName,
+      version: this.clientVersion,
+    });
+    const transport = new StreamableHTTPClientTransport(this.url, {
+      requestInit: this.requestInit,
+    });
 
     try {
       await client.connect(transport);
@@ -106,7 +116,10 @@ export class RemoteMcpProvider implements McpProvider {
     }
   }
 
-  async callTool(name: string, args: Record<string, unknown> = {}): Promise<Awaited<ReturnType<Client["callTool"]>>> {
+  async callTool(
+    name: string,
+    args: Record<string, unknown> = {},
+  ): Promise<Awaited<ReturnType<Client["callTool"]>>> {
     await this.ensureConnected();
     try {
       return await this.client!.callTool({ name, arguments: args });
@@ -123,7 +136,9 @@ export class RemoteMcpProvider implements McpProvider {
   remoteToolName(namespacedToolName: string): string {
     const prefix = `${this.namespace}_`;
     if (!namespacedToolName.startsWith(prefix)) {
-      throw new Error(`Tool '${namespacedToolName}' does not belong to provider '${this.id}'`);
+      throw new Error(
+        `Tool '${namespacedToolName}' does not belong to provider '${this.id}'`,
+      );
     }
     return namespacedToolName.slice(prefix.length);
   }
@@ -147,11 +162,12 @@ export class RemoteMcpProvider implements McpProvider {
   }
 
   private unavailableError(cause?: unknown): Error {
-    const detail = this._lastError ?? (cause instanceof Error ? cause.message : undefined);
+    const detail =
+      this._lastError ?? (cause instanceof Error ? cause.message : undefined);
     return new Error(
       `MCP provider '${this.id}' (${this.namespace}) is not connected. ` +
-      `Start the ${this.id} MCP server/editor and try again.` +
-      (detail ? ` Connection error: ${detail}` : ""),
+        `Start the ${this.id} MCP server/editor and try again.` +
+        (detail ? ` Connection error: ${detail}` : ""),
     );
   }
 }

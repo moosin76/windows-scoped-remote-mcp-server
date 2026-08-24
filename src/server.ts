@@ -19,11 +19,22 @@ async function main() {
   console.log("  Windows Scoped Remote MCP Server");
   console.log("============================================================");
   console.log(`📁 Active Workspace: ${activeWs.name} (${activeWs.path})`);
-  console.log(`📚 All Workspaces:   ${workspaceManager.getAllWorkspaces().map(w => `${w.name} -> ${w.path}`).join(" | ")}`);
-  console.log(`🌐 Browser Engine:   Playwright (${config.browserHeadless ? "Headless/Background" : "Headed/Visible Window"})`);
+  console.log(
+    `📚 All Workspaces:   ${workspaceManager
+      .getAllWorkspaces()
+      .map((w) => `${w.name} -> ${w.path}`)
+      .join(" | ")}`,
+  );
+  console.log(
+    `🌐 Browser Engine:   Playwright (${config.browserHeadless ? "Headless/Background" : "Headed/Visible Window"})`,
+  );
   console.log(`🐚 Default Shell:    ${config.defaultShell}`);
-  console.log(`🔒 Sandbox Guard:    Active (${workspaceManager.getAllRoots().length} Multi-Root Workspaces Contained)`);
-  console.log(`🔌 Local Endpoint:   http://localhost:${config.port}${config.endpoint}`);
+  console.log(
+    `🔒 Sandbox Guard:    Active (${workspaceManager.getAllRoots().length} Multi-Root Workspaces Contained)`,
+  );
+  console.log(
+    `🔌 Local Endpoint:   http://localhost:${config.port}${config.endpoint}`,
+  );
   if (config.publicUrl) {
     console.log(`🌐 Public Endpoint:  ${config.publicUrl}${config.endpoint}`);
   }
@@ -51,14 +62,20 @@ async function main() {
 
   const providerRegistry = createProviderRegistry(config);
   if (providerRegistry.list().length > 0) {
-    console.log(`[MCP Providers] Connecting ${providerRegistry.list().length} provider(s)...`);
+    console.log(
+      `[MCP Providers] Connecting ${providerRegistry.list().length} provider(s)...`,
+    );
     await providerRegistry.connectAll();
     const statuses = providerRegistry.listStatuses();
     const ready = statuses.filter((status) => status.connected);
     const unavailable = statuses.filter((status) => !status.connected);
-    console.log(`[MCP Providers] Ready (${ready.length}/${statuses.length} provider(s), ${providerRegistry.listCachedTools().length} remote tools)`);
+    console.log(
+      `[MCP Providers] Ready (${ready.length}/${statuses.length} provider(s), ${providerRegistry.listCachedTools().length} remote tools)`,
+    );
     for (const status of unavailable) {
-      console.warn(`[MCP Provider Warning] ${status.id} is unavailable. Core WSR tools remain available.`);
+      console.warn(
+        `[MCP Provider Warning] ${status.id} is unavailable. Core WSR tools remain available.`,
+      );
     }
   }
 
@@ -67,8 +84,12 @@ async function main() {
     intervalMs: config.mcpProviderHealthIntervalMs,
     retryIntervalMs: config.mcpProviderRetryIntervalMs,
     onToolsChanged: (providerId) => {
-      const count = providerRegistry.listCachedTools().filter((tool) => tool.providerId === providerId).length;
-      console.log(`[MCP Provider Scheduler] '${providerId}' tool registry refreshed (${count} tools)`);
+      const count = providerRegistry
+        .listCachedTools()
+        .filter((tool) => tool.providerId === providerId).length;
+      console.log(
+        `[MCP Provider Scheduler] '${providerId}' tool registry refreshed (${count} tools)`,
+      );
     },
   });
   providerScheduler.start();
@@ -85,6 +106,7 @@ async function main() {
     fileService,
     workspaceManager,
     browserManager,
+    providerRegistry,
   );
   console.log(`[HTTP Server] Listening on ${config.host}:${config.port}`);
 
@@ -92,8 +114,12 @@ async function main() {
   try {
     tunnel = await startCloudflareTunnel(config, projectRoot);
   } catch (err) {
-    console.warn(`[Tunnel Warning] Could not start Cloudflare Tunnel: ${(err as Error).message}`);
-    console.log("ℹ️  You can still connect to the local endpoint or run cloudflared manually.");
+    console.warn(
+      `[Tunnel Warning] Could not start Cloudflare Tunnel: ${(err as Error).message}`,
+    );
+    console.log(
+      "ℹ️  You can still connect to the local endpoint or run cloudflared manually.",
+    );
   }
 
   const shutdown = async () => {

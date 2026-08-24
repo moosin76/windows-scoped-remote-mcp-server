@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { ProviderRegistry } from "../src/providers/provider-registry.js";
 import type { McpProvider } from "../src/providers/mcp-provider.js";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 
-function fakeProvider(id: string, namespace: string, tools: string[]): McpProvider & { connect: () => Promise<void>; isConnected: () => boolean; lastError?: string } {
-  const toolList: Tool[] = tools.map((name) => ({ name, description: `${name} test tool`, inputSchema: { type: "object" } }));
+function fakeProvider(
+  id: string,
+  namespace: string,
+  tools: string[],
+): McpProvider & {
+  connect: () => Promise<void>;
+  isConnected: () => boolean;
+  lastError?: string;
+} {
+  const toolList: Tool[] = tools.map((name) => ({
+    name,
+    description: `${name} test tool`,
+    inputSchema: { type: "object" },
+  }));
   return {
     id,
     namespace,
@@ -27,39 +39,52 @@ describe("ProviderRegistry", () => {
     const registry = new ProviderRegistry();
     registry.add(fakeProvider("godot", "godot", ["get_scene", "run_project"]));
     const tools = await registry.listTools();
-    expect(tools.map((item) => item.tool.name)).toEqual(["godot_get_scene", "godot_run_project"]);
+    expect(tools.map((item) => item.tool.name)).toEqual([
+      "godot_get_scene",
+      "godot_run_project",
+    ]);
     expect(tools[0]?.remoteName).toBe("get_scene");
   });
 
   it("rejects duplicate ids and namespaces", () => {
     const registry = new ProviderRegistry();
     registry.add(fakeProvider("godot", "godot", ["get_scene"]));
-    expect(() => registry.add(fakeProvider("godot", "other", []))).toThrow("already registered");
-    expect(() => registry.add(fakeProvider("blender", "godot", []))).toThrow("namespace");
+    expect(() => registry.add(fakeProvider("godot", "other", []))).toThrow(
+      "already registered",
+    );
+    expect(() => registry.add(fakeProvider("blender", "godot", []))).toThrow(
+      "namespace",
+    );
   });
 
   it("keeps the registry usable when a provider is unavailable", async () => {
     const registry = new ProviderRegistry();
     const unavailable = fakeProvider("godot", "godot", []);
-    unavailable.connect = async () => { throw new Error("ECONNREFUSED"); };
+    unavailable.connect = async () => {
+      throw new Error("ECONNREFUSED");
+    };
     unavailable.isConnected = () => false;
     unavailable.lastError = undefined;
     registry.add(unavailable);
 
     await expect(registry.connectAll()).resolves.toBeUndefined();
-    expect(registry.listStatuses()).toEqual([{
-      id: "godot",
-      namespace: "godot",
-      connected: false,
-      toolCount: 0,
-    }]);
+    expect(registry.listStatuses()).toEqual([
+      {
+        id: "godot",
+        namespace: "godot",
+        connected: false,
+        toolCount: 0,
+      },
+    ]);
   });
 
   it("rediscovers a provider that becomes available later", async () => {
     const registry = new ProviderRegistry();
     const provider = fakeProvider("godot", "godot", ["get_scene"]);
     let connected = false;
-    provider.connect = async () => { connected = true; };
+    provider.connect = async () => {
+      connected = true;
+    };
     provider.isConnected = () => connected;
     registry.add(provider);
 

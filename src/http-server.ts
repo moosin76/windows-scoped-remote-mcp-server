@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { Server as HttpServer } from "node:http";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createOAuthMetadata, mcpAuthRouter, type AuthRouterOptions } from "@modelcontextprotocol/sdk/server/auth/router.js";
+import {
+  createMcpHandler,
+  type McpHttpHandler,
+} from "@modelcontextprotocol/server";
+import {
+  createOAuthMetadata,
+  mcpAuthRouter,
+} from "@modelcontextprotocol/server-legacy/auth";
+import type { AuthRouterOptions } from "@modelcontextprotocol/server-legacy/auth";
+import { toNodeHandler } from "@modelcontextprotocol/node";
 import express, { type Request, type Response } from "express";
 
 import { createAuthMiddleware } from "./auth.js";
@@ -29,6 +37,33 @@ function rpcError(response: Response, status: number, message: string): void {
   });
 }
 
+export function createWsrMcpHandler(
+  config: AppConfig,
+  processManager: ProcessManager,
+  fileService: FileService,
+  workspaceManager?: WorkspaceManager,
+  browserManager?: BrowserManager,
+  providerRegistry?: ProviderRegistry,
+): McpHttpHandler {
+  return createMcpHandler(
+    () =>
+      createMcpServer(
+        config,
+        processManager,
+        fileService,
+        workspaceManager,
+        browserManager,
+        providerRegistry,
+      ),
+    {
+      legacy: "stateless",
+      onerror: (error) => {
+        console.error("[MCP Handler Error]", errorMessage(error));
+      },
+    },
+  );
+}
+
 export async function startHttpServer(
   config: AppConfig,
   processManager: ProcessManager,
@@ -45,7 +80,10 @@ export async function startHttpServer(
   app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id, Accept");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, Mcp-Session-Id, MCP-Protocol-Version, Mcp-Method, Mcp-Name, Accept",
+    );
     if (req.method === "OPTIONS") {
       res.sendStatus(204);
       return;
@@ -54,7 +92,9 @@ export async function startHttpServer(
     if (req.path === config.endpoint) {
       const existing = req.headers.accept || "";
       if (!existing.includes("text/event-stream")) {
-        req.headers.accept = existing ? `${existing}, text/event-stream` : "application/json, text/event-stream, */*";
+        req.headers.accept = existing
+          ? `${existing}, text/event-stream`
+          : "application/json, text/event-stream, */*";
       }
     }
     next();
@@ -122,22 +162,28 @@ export async function startHttpServer(
     }
   });
 
-  app.post(["/api/list-directory", "/api/list_directory"], express.json(), async (req, res) => {
-    try {
-      const p = req.body?.path || ".";
-      const recursive = !!req.body?.recursive;
-      const result = await fileService.listDirectory(p, { recursive });
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: errorMessage(e) });
-    }
-  });
+  app.post(
+    ["/api/list-directory", "/api/list_directory"],
+    express.json(),
+    async (req, res) => {
+      try {
+        const p = req.body?.path || ".";
+        const recursive = !!req.body?.recursive;
+        const result = await fileService.listDirectory(p, { recursive });
+        res.json(result);
+      } catch (e) {
+        res.status(500).json({ error: errorMessage(e) });
+      }
+    },
+  );
 
   app.get(["/api/read-file", "/api/read_file"], async (req, res) => {
     try {
       const p = req.query.path as string;
       if (!p) {
-        res.status(400).json({ error: "Missing required 'path' query parameter" });
+        res
+          .status(400)
+          .json({ error: "Missing required 'path' query parameter" });
         return;
       }
       const result = await fileService.readFile(p);
@@ -147,69 +193,88 @@ export async function startHttpServer(
     }
   });
 
-  app.post(["/api/read-file", "/api/read_file"], express.json(), async (req, res) => {
-    try {
-      const p = req.body?.path;
-      if (!p) {
-        res.status(400).json({ error: "Missing required 'path' in body" });
-        return;
+  app.post(
+    ["/api/read-file", "/api/read_file"],
+    express.json(),
+    async (req, res) => {
+      try {
+        const p = req.body?.path;
+        if (!p) {
+          res.status(400).json({ error: "Missing required 'path' in body" });
+          return;
+        }
+        const result = await fileService.readFile(p, {
+          offset: req.body.offset,
+          maxBytes: req.body.maxBytes,
+        });
+        res.json(result);
+      } catch (e) {
+        res.status(500).json({ error: errorMessage(e) });
       }
-      const result = await fileService.readFile(p, { offset: req.body.offset, maxBytes: req.body.maxBytes });
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: errorMessage(e) });
-    }
-  });
+    },
+  );
 
-  app.post(["/api/write-file", "/api/write_file"], express.json(), async (req, res) => {
-    try {
-      const { path: p, content, mode } = req.body || {};
-      if (!p || content === undefined) {
-        res.status(400).json({ error: "Missing required 'path' or 'content'" });
-        return;
+  app.post(
+    ["/api/write-file", "/api/write_file"],
+    express.json(),
+    async (req, res) => {
+      try {
+        const { path: p, content, mode } = req.body || {};
+        if (!p || content === undefined) {
+          res
+            .status(400)
+            .json({ error: "Missing required 'path' or 'content'" });
+          return;
+        }
+        const result = await fileService.writeFile(p, content, { mode });
+        res.json(result);
+      } catch (e) {
+        res.status(500).json({ error: errorMessage(e) });
       }
-      const result = await fileService.writeFile(p, content, { mode });
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({ error: errorMessage(e) });
-    }
-  });
+    },
+  );
 
-  app.post(["/api/exec", "/api/exec_command"], express.json(), async (req, res) => {
-    try {
-      const { cmd, shell, cwd, timeoutMs } = req.body || {};
-      if (!cmd) {
-        res.status(400).json({ error: "Missing required 'cmd'" });
-        return;
-      }
-      const isWin = process.platform === "win32";
-      const selectedShell = shell || (isWin ? "powershell" : "bash");
-      let executable = selectedShell;
-      let args: string[] = [];
-      if (selectedShell === "powershell") {
-        executable = "powershell.exe";
-        args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd];
-      } else if (selectedShell === "cmd") {
-        executable = "cmd.exe";
-        args = ["/c", cmd];
-      } else {
-        args = ["-c", cmd];
-      }
+  app.post(
+    ["/api/exec", "/api/exec_command"],
+    express.json(),
+    async (req, res) => {
+      try {
+        const { cmd, shell, cwd, timeoutMs } = req.body || {};
+        if (!cmd) {
+          res.status(400).json({ error: "Missing required 'cmd'" });
+          return;
+        }
+        const isWin = process.platform === "win32";
+        const selectedShell = shell || (isWin ? "powershell" : "bash");
+        let executable = selectedShell;
+        let args: string[] = [];
+        if (selectedShell === "powershell") {
+          executable = "powershell.exe";
+          args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd];
+        } else if (selectedShell === "cmd") {
+          executable = "cmd.exe";
+          args = ["/c", cmd];
+        } else {
+          args = ["-c", cmd];
+        }
 
-      const resolvedCwd = fileService.resolve(cwd || ".");
-      const sessionId = await processManager.start({
-        executable,
-        args,
-        commandForDisplay: cmd,
-        cwd: resolvedCwd,
-        timeoutMs: timeoutMs || 30000,
-      });
-      const readRes = await processManager.read(sessionId, { waitMs: timeoutMs || 30000 });
-      res.json(readRes);
-    } catch (e) {
-      res.status(500).json({ error: errorMessage(e) });
-    }
-  });
+        const resolvedCwd = fileService.resolve(cwd || ".");
+        const sessionId = await processManager.start({
+          executable,
+          args,
+          commandForDisplay: cmd,
+          cwd: resolvedCwd,
+          timeoutMs: timeoutMs || 30000,
+        });
+        const readRes = await processManager.read(sessionId, {
+          waitMs: timeoutMs || 30000,
+        });
+        res.json(readRes);
+      } catch (e) {
+        res.status(500).json({ error: errorMessage(e) });
+      }
+    },
+  );
 
   app.get(["/api/stat", "/api/stat_path"], async (req, res) => {
     try {
@@ -227,6 +292,19 @@ export async function startHttpServer(
 
   const authenticate = createAuthMiddleware(config, oauthProvider);
   const parseJson = express.json({ limit: config.maxRequestBody });
+  const mcpHandler = createWsrMcpHandler(
+    config,
+    processManager,
+    fileService,
+    workspaceManager,
+    browserManager,
+    providerRegistry,
+  );
+  const handleMcpRequest = toNodeHandler(mcpHandler, {
+    onerror: (error) => {
+      console.error("[MCP Adapter Error]", errorMessage(error));
+    },
+  });
 
   // Health check endpoint
   app.get("/health", (_req, res) => {
@@ -234,8 +312,13 @@ export async function startHttpServer(
       status: "ok",
       name: "windows-scoped-remote-mcp",
       version: "1.0.0",
-      activeWorkspace: workspaceManager?.getActiveWorkspace() || { name: "default", path: config.workspaceRoot },
-      allWorkspaces: workspaceManager?.getAllWorkspaces() || [{ name: "default", path: config.workspaceRoot, isActive: true }],
+      activeWorkspace: workspaceManager?.getActiveWorkspace() || {
+        name: "default",
+        path: config.workspaceRoot,
+      },
+      allWorkspaces: workspaceManager?.getAllWorkspaces() || [
+        { name: "default", path: config.workspaceRoot, isActive: true },
+      ],
       defaultShell: config.defaultShell,
       activeProcesses: processManager.list().length,
       authRequired: !config.allowNoAuth || !!config.authToken,
@@ -243,49 +326,33 @@ export async function startHttpServer(
   });
 
   // MCP Streamable HTTP endpoint (POST /mcp)
-  app.post(config.endpoint, parseJson, authenticate, async (req: Request, res: Response) => {
-    const rpcMethodName = req.body?.method || "unknown";
-    const toolName = req.body?.params?.name || "";
-    console.log(`[MCP Inbound] Method: ${rpcMethodName} ${toolName ? `(${toolName})` : ""} from ${req.ip}`);
+  app.post(
+    config.endpoint,
+    parseJson,
+    authenticate,
+    async (req: Request, res: Response) => {
+      const rpcMethodName = req.body?.method || "unknown";
+      const toolName = req.body?.params?.name || "";
+      console.log(
+        `[MCP Inbound] Method: ${rpcMethodName} ${toolName ? `(${toolName})` : ""} from ${req.ip}`,
+      );
 
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
+      res.once("finish", () => {
+        console.log(
+          `[MCP Outbound] Status: ${res.statusCode} for ${rpcMethodName}`,
+        );
+      });
 
-    const mcpServer = await createMcpServer(
-      config,
-      processManager,
-      fileService,
-      workspaceManager,
-      browserManager,
-      providerRegistry,
-    );
-
-    const closeRequest = async () => {
-      await mcpServer.close().catch(() => {});
-    };
-
-    res.once("finish", () => {
-      console.log(`[MCP Outbound] Status: ${res.statusCode} for ${rpcMethodName}`);
-      void closeRequest();
-    });
-    res.once("close", () => void closeRequest());
-
-    try {
-      transport.onerror = (err) => {
-        console.error("[MCP Transport Error]", errorMessage(err));
-      };
-      await mcpServer.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-    } catch (err) {
-      console.error("[MCP Handler Error]", errorMessage(err));
-      if (!res.headersSent) {
-        rpcError(res, 500, `Internal MCP server error: ${errorMessage(err)}`);
+      try {
+        await handleMcpRequest(req, res, req.body);
+      } catch (err) {
+        console.error("[MCP Handler Error]", errorMessage(err));
+        if (!res.headersSent) {
+          rpcError(res, 500, `Internal MCP server error: ${errorMessage(err)}`);
+        }
       }
-      await closeRequest();
-    }
-  });
+    },
+  );
 
   // Method not allowed on GET /mcp
   app.get(config.endpoint, (_req, res) => {
@@ -301,6 +368,7 @@ export async function startHttpServer(
           await new Promise<void>((res, rej) => {
             httpServer.close((err) => (err ? rej(err) : res()));
           });
+          await mcpHandler.close();
         },
       });
     });

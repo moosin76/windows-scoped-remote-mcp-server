@@ -9,6 +9,7 @@ Cloudflare Tunnel
   ↓
 Windows Scoped Remote MCP Server
   ├─ Express / MCP endpoint
+  │    └─ createMcpHandler (2026-07-28 + 2025 legacy fallback)
   ├─ Workspace tools
   ├─ File tools
   ├─ Process / Exec tools
@@ -34,6 +35,35 @@ McpProvider
 ```
 
 현재 `RemoteMcpProvider`는 Streamable HTTP MCP 서버를 위한 범용 구현이다.
+
+## MCP SDK v2와 inbound transport
+
+WSR은 공식 TypeScript SDK v2 split package 구조를 사용한다.
+
+```text
+@modelcontextprotocol/server  → McpServer / createMcpHandler
+@modelcontextprotocol/node    → Express/Node adapter
+@modelcontextprotocol/client  → RemoteMcpProvider client
+```
+
+`createMcpHandler`는 하나의 `createMcpServer` factory를 양쪽 프로토콜 era에 사용한다.
+
+```text
+ChatGPT / MCP client
+        ↓ POST /mcp
+createMcpHandler
+  ├─ modern (2026-07-28)
+  │    ├─ server/discover
+  │    └─ 요청별 protocol/client 정보가 담긴 _meta envelope
+  └─ legacy (2025-era, stateless)
+       ├─ initialize
+       ├─ notifications/initialized
+       └─ tools/list / tools/call
+```
+
+따라서 `server/discover` 응답을 application code에서 직접 흉내내거나 별도 tool catalog를 만들지 않는다. capability와 server identity는 `McpServer` 정의를 기반으로 SDK가 생성해야 하며, modern/legacy 모두 같은 tool 등록 factory를 사용해야 한다.
+
+기존 OAuth Authorization Server router는 v2에서 제거되었으므로 현재는 공식 마이그레이션 브리지인 `@modelcontextprotocol/server-legacy/auth`를 사용한다. Resource Server와 authorization endpoint 동작을 보존하기 위한 임시 호환 계층이며, 장기적으로 전용 OAuth/IdP 구현으로 교체한다.
 
 ## Tool 흐름
 
@@ -123,6 +153,6 @@ MCP_PROVIDER_HEALTH_INTERVAL_MS=10000
 MCP_PROVIDER_RETRY_INTERVAL_MS=5000
 ```
 
-Tool 정의가 변경되면 Registry snapshot을 갱신한다. 현재 HTTP 계층은 요청마다 MCP Server를 구성하므로 다음 `tools/list` 요청에 최신 tool 목록이 반영된다.
+Tool 정의가 변경되면 Registry snapshot을 갱신한다. `createMcpHandler` factory가 요청마다 MCP Server를 구성하므로 다음 `tools/list` 요청에 최신 tool 목록이 반영된다.
 
 MCP 세션을 장기간 유지하면서 즉시 `tools/list_changed` notification을 전달해야 하는 경우에는 향후 세션 관리 구조와 함께 별도로 구현한다.
