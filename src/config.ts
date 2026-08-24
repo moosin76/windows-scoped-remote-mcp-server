@@ -38,6 +38,8 @@ export interface AppConfig {
   cloudflareTunnelToken: string | undefined;
   godotMcpEnabled: boolean;
   godotMcpUrl: string;
+  postgresqlMcpEnabled: boolean;
+  postgresqlMcpUrl: string | undefined;
   mcpProviderHealthIntervalMs: number;
   mcpProviderRetryIntervalMs: number;
 }
@@ -119,6 +121,11 @@ export function loadConfig(
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
   const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
   const godotMcpUrl = env.MCP_GODOT_URL?.trim() || "http://127.0.0.1:8000/mcp";
+  const postgresqlMcpEnabled = parseBoolean(env.MCP_POSTGRESQL_ENABLED, false);
+  const postgresqlMcpUrl = env.MCP_POSTGRESQL_URL?.trim() || undefined;
+  if (postgresqlMcpEnabled && !postgresqlMcpUrl) {
+    throw new Error("MCP_POSTGRESQL_URL is required when MCP_POSTGRESQL_ENABLED=true");
+  }
 
   return {
     host: env.MCP_HOST?.trim() || "0.0.0.0",
@@ -177,6 +184,8 @@ export function loadConfig(
     cloudflareTunnelToken,
     godotMcpEnabled,
     godotMcpUrl,
+    postgresqlMcpEnabled,
+    postgresqlMcpUrl,
     mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),
     mcpProviderRetryIntervalMs: parseInteger(env.MCP_PROVIDER_RETRY_INTERVAL_MS, 5_000, "MCP_PROVIDER_RETRY_INTERVAL_MS", 1_000, 3_600_000),
   };

@@ -13,5 +13,15 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
       clientVersion: "1.0.0",
     }));
   }
+  if (config.postgresqlMcpEnabled && config.postgresqlMcpUrl) {
+    registry.add(new RemoteMcpProvider({
+      id: "postgresql",
+      namespace: "postgresql",
+      url: config.postgresqlMcpUrl,
+      transport: "sse",
+      clientName: "windows-scoped-remote-mcp-gateway",
+      clientVersion: "1.0.0",
+    }));
+  }
   return registry;
 }

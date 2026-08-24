@@ -3,6 +3,8 @@
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import type { Tool } from "@modelcontextprotocol/client";
+import { Client as LegacyClient } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
 export interface McpProvider {
   readonly id: string;
@@ -20,6 +22,8 @@ export interface McpProvider {
   remoteToolName(namespacedToolName: string): string;
 }
 
+export type RemoteMcpTransport = "streamable-http" | "sse";
+
 export interface RemoteMcpProviderOptions {
   id: string;
   namespace: string;
@@ -27,9 +31,10 @@ export interface RemoteMcpProviderOptions {
   clientName?: string;
   clientVersion?: string;
   requestInit?: RequestInit;
+  transport?: RemoteMcpTransport;
 }
 
-/** Generic MCP-over-Streamable-HTTP provider. */
+/** Generic remote MCP provider supporting Streamable HTTP and legacy SSE transports. */
 export class RemoteMcpProvider implements McpProvider {
   readonly id: string;
   readonly namespace: string;
@@ -38,8 +43,9 @@ export class RemoteMcpProvider implements McpProvider {
   private readonly clientName: string;
   private readonly clientVersion: string;
   private readonly requestInit?: RequestInit;
+  private readonly transportType: RemoteMcpTransport;
   private client?: Client;
-  private transport?: StreamableHTTPClientTransport;
+  private legacyClient?: LegacyClient;
   private connected = false;
   private _lastError?: string;
   private connecting?: Promise<void>;
@@ -51,6 +57,7 @@ export class RemoteMcpProvider implements McpProvider {
     this.clientName = options.clientName ?? "windows-scoped-remote-mcp-gateway";
     this.clientVersion = options.clientVersion ?? "1.0.0";
     this.requestInit = options.requestInit;
+    this.transportType = options.transport ?? "streamable-http";
   }
 
   get lastError(): string | undefined {
@@ -70,6 +77,30 @@ export class RemoteMcpProvider implements McpProvider {
   }
 
   private async createConnection(): Promise<void> {
+    if (this.transportType === "sse") {
+      const client = new LegacyClient({
+        name: this.clientName,
+        version: this.clientVersion,
+      });
+      const transport = new SSEClientTransport(this.url, {
+        requestInit: this.requestInit,
+      });
+
+      try {
+        await client.connect(transport);
+        this.legacyClient = client;
+        this.connected = true;
+        this._lastError = undefined;
+      } catch (error) {
+        await transport.close().catch(() => undefined);
+        await client.close().catch(() => undefined);
+        this.connected = false;
+        this._lastError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
+      return;
+    }
+
     const client = new Client({
       name: this.clientName,
       version: this.clientVersion,
@@ -81,7 +112,6 @@ export class RemoteMcpProvider implements McpProvider {
     try {
       await client.connect(transport);
       this.client = client;
-      this.transport = transport;
       this.connected = true;
       this._lastError = undefined;
     } catch (error) {
@@ -95,10 +125,14 @@ export class RemoteMcpProvider implements McpProvider {
 
   async close(): Promise<void> {
     this.connected = false;
-    this.transport = undefined;
     const client = this.client;
+    const legacyClient = this.legacyClient;
     this.client = undefined;
-    await client?.close().catch(() => undefined);
+    this.legacyClient = undefined;
+    await Promise.all([
+      client?.close().catch(() => undefined),
+      legacyClient?.close().catch(() => undefined),
+    ]);
   }
 
   isConnected(): boolean {
@@ -108,8 +142,10 @@ export class RemoteMcpProvider implements McpProvider {
   async listTools(): Promise<readonly Tool[]> {
     await this.ensureConnected();
     try {
-      const result = await this.client!.listTools();
-      return result.tools;
+      const result = this.transportType === "sse"
+        ? await this.legacyClient!.listTools()
+        : await this.client!.listTools();
+      return result.tools as readonly Tool[];
     } catch (error) {
       await this.markDisconnected(error);
       throw this.unavailableError(error);
@@ -122,6 +158,12 @@ export class RemoteMcpProvider implements McpProvider {
   ): Promise<Awaited<ReturnType<Client["callTool"]>>> {
     await this.ensureConnected();
     try {
+      if (this.transportType === "sse") {
+        return await this.legacyClient!.callTool({
+          name,
+          arguments: args,
+        }) as Awaited<ReturnType<Client["callTool"]>>;
+      }
       return await this.client!.callTool({ name, arguments: args });
     } catch (error) {
       await this.markDisconnected(error);
@@ -156,9 +198,13 @@ export class RemoteMcpProvider implements McpProvider {
     this.connected = false;
     this._lastError = error instanceof Error ? error.message : String(error);
     const client = this.client;
+    const legacyClient = this.legacyClient;
     this.client = undefined;
-    this.transport = undefined;
-    await client?.close().catch(() => undefined);
+    this.legacyClient = undefined;
+    await Promise.all([
+      client?.close().catch(() => undefined),
+      legacyClient?.close().catch(() => undefined),
+    ]);
   }
 
   private unavailableError(cause?: unknown): Error {
