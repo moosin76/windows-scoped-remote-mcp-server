@@ -294,8 +294,6 @@ npm start
 
 ---
 
-## 📄 라이선스
-MIT License
 ## MCP 확장하기: 원하는 MCP를 추가해서 사용하기
 
 이 프로젝트는 모든 사용자가 같은 MCP를 사용할 필요가 없도록 Remote MCP Provider 구조를 사용합니다.
@@ -380,3 +378,6 @@ godot_* blender_* <provider>_*
 - `skills/add-remote-mcp-provider/SKILL.md` — 새로운 MCP 추가 절차
 - `skills/test-mcp-provider/SKILL.md` — Provider 테스트 방법
 - `skills/debug-mcp-gateway/SKILL.md` — MCP 연결 및 도구 오류 진단
+
+## 📄 라이선스
+MIT License
