@@ -1,4 +1,4 @@
-﻿import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { McpProvider } from "./mcp-provider.js";
 
 export interface NamespacedTool {
@@ -10,6 +10,7 @@ export interface NamespacedTool {
 /** Registry for remote MCP providers and their namespaced tools. */
 export class ProviderRegistry {
   private readonly providers = new Map<string, McpProvider>();
+  private readonly toolSnapshots = new Map<string, readonly NamespacedTool[]>();
 
   add(provider: McpProvider): void {
     if (this.providers.has(provider.id)) {
@@ -23,7 +24,10 @@ export class ProviderRegistry {
 
   remove(id: string): McpProvider | undefined {
     const provider = this.providers.get(id);
-    if (provider) this.providers.delete(id);
+    if (provider) {
+      this.providers.delete(id);
+      this.toolSnapshots.delete(id);
+    }
     return provider;
   }
 
@@ -38,6 +42,7 @@ export class ProviderRegistry {
   async connectAll(): Promise<void> {
     for (const provider of this.providers.values()) {
       await provider.connect();
+      await this.refresh(provider.id);
     }
   }
 
@@ -45,21 +50,32 @@ export class ProviderRegistry {
     await Promise.all([...this.providers.values()].map((provider) => provider.close()));
   }
 
-  async listTools(): Promise<readonly NamespacedTool[]> {
+  async refresh(id: string): Promise<readonly NamespacedTool[]> {
+    const provider = this.providers.get(id);
+    if (!provider) throw new Error(`MCP provider '${id}' is not registered`);
+
     const result: NamespacedTool[] = [];
     const names = new Set<string>();
-
-    for (const provider of this.providers.values()) {
-      for (const tool of await provider.listTools()) {
-        const remoteName = tool.name;
-        const name = provider.namespacedToolName(remoteName);
-        if (names.has(name)) throw new Error(`Duplicate namespaced MCP tool '${name}'`);
-        names.add(name);
-        result.push({ providerId: provider.id, remoteName, tool: { ...tool, name } });
-      }
+    for (const tool of await provider.listTools()) {
+      const remoteName = tool.name;
+      const name = provider.namespacedToolName(remoteName);
+      if (names.has(name)) throw new Error(`Duplicate namespaced MCP tool '${name}'`);
+      names.add(name);
+      result.push({ providerId: provider.id, remoteName, tool: { ...tool, name } });
     }
 
-    return result;
+    const snapshot = Object.freeze(result.slice());
+    this.toolSnapshots.set(id, snapshot);
+    return snapshot;
+  }
+
+  async listTools(): Promise<readonly NamespacedTool[]> {
+    for (const provider of this.providers.values()) {
+      if (provider.isConnected() && !this.toolSnapshots.has(provider.id)) {
+        await this.refresh(provider.id);
+      }
+    }
+    return [...this.toolSnapshots.values()].flat();
   }
 
   resolve(namespacedName: string): { provider: McpProvider; remoteName: string } {
