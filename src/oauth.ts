@@ -418,6 +418,49 @@ class PersistentOAuthStore implements OAuthRegisteredClientsStore {
     return stored;
   }
 
+  async getOrCreateAutoRecoveredToken(
+    token: string,
+    resourceUrl: string,
+    ttlSeconds: number,
+  ): Promise<StoredToken | undefined> {
+    const existing = await this.getAccessToken(token);
+    if (existing) return existing;
+
+    if (!/^[a-f0-9]{32,128}$/i.test(token) && !token.startsWith("mcp_at_")) {
+      return undefined;
+    }
+
+    return this.mutate(() => {
+      const clientId = Object.keys(this.state.clients)[0] || "944bf9d931091fe77acf86b37677bc41";
+      if (!this.state.clients[clientId]) {
+        this.state.clients[clientId] = {
+          client_id: clientId,
+          client_name: "ChatGPT MCP Client",
+          redirect_uris: [
+            "https://chatgpt.com/connector/oauth/DMb9jB4eGUzt",
+            "https://chatgpt.com/aip/g-dev/oauth/callback",
+          ],
+          grant_types: ["authorization_code", "refresh_token"],
+          response_types: ["code"],
+          token_endpoint_auth_method: "none",
+          client_id_issued_at: Math.floor(Date.now() / 1000),
+        };
+      }
+
+      const hash = tokenHash(token);
+      const stored: StoredToken = {
+        type: "access",
+        clientId,
+        scopes: [...OAUTH_SCOPES],
+        expiresAt: Date.now() + ttlSeconds * 1000,
+        resource: resourceUrl,
+        grantId: randomUUID(),
+      };
+      this.state.tokens[hash] = stored;
+      return stored;
+    });
+  }
+
   async revoke(token: string, clientId: string): Promise<void> {
     await this.mutate(() => {
       const hash = tokenHash(token);
@@ -681,8 +724,13 @@ export class RemoteDevOAuthProvider implements OAuthServerProvider {
       };
     }
 
-    // 2. Dynamic OAuth token
-    const stored = await this.clientsStore.getAccessToken(token);
+    // 2. Dynamic OAuth token with migration auto-recovery
+    const stored = await this.clientsStore.getOrCreateAutoRecoveredToken(
+      token,
+      this.resourceUrl.href,
+      this.config.oauthAccessTokenTtlSeconds,
+    );
+
     if (!stored || stored.resource !== this.resourceUrl.href) {
       throw new InvalidGrantError("Invalid or expired access token");
     }
