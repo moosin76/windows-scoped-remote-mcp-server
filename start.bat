@@ -18,11 +18,18 @@ if not exist "node_modules" (
     )
 )
 
-:: 2. Check if .env exists, copy from .env.example if missing
+:: 2. Require a configured .env file before starting
 if not exist ".env" (
-    echo [*] Creating .env from .env.example...
-    copy .env.example .env
-    echo [!] Please configure your .env file with your settings.
+    echo [!] .env file not found.
+    echo.
+    echo     Please create .env from .env.example and configure it first:
+    echo.
+    echo     copy .env.example .env
+    echo.
+    echo     Then edit .env and set the required values before running start.bat again.
+    echo.
+    pause
+    exit /b 1
 )
 
 :: 3. Check if bin\cloudflared.exe exists, download automatically if missing
