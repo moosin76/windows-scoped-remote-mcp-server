@@ -54,3 +54,10 @@ body.theme-light #q-app {
   background: var(--wsr-bg);
   color: var(--wsr-text);
 }
+
+/* The language q-menu is teleported outside MainLayout's scoped DOM. */
+body.theme-dark .lang-menu,
+body.theme-dark .lang-menu .q-item,
+body.theme-dark .lang-menu .q-item__section {
+  color: #000000 !important;
+}

@@ -15,7 +15,7 @@
         <a class="github-btn" href="https://github.com/moosin76/windows-scoped-remote-mcp-server" target="_blank" rel="noreferrer">GitHub ↗</a>
       </q-toolbar>
     </q-header>
-    <q-page-container><router-view /></q-page-container>
+    <q-page-container><router-view /><footer class="site-footer"><div class="footer-inner"><div><div class="footer-brand">Windows Scoped Remote MCP Server</div><div class="footer-copy">ChatGPT와 Windows 개발환경을 연결하는 MCP Gateway</div></div><div class="footer-links"><router-link to="/features">{{ t('nav.features') }}</router-link><router-link to="/architecture">{{ t('nav.architecture') }}</router-link><router-link to="/getting-started">{{ t('nav.quickstart') }}</router-link><router-link to="/mcp-extension">{{ t('nav.extension') }}</router-link><a href="https://github.com/moosin76/windows-scoped-remote-mcp-server" target="_blank" rel="noreferrer">GitHub ↗</a><a class="sponsor-link" href="https://github.com/sponsors/moosin76" target="_blank" rel="noreferrer">♥ 후원하기</a></div><div class="footer-bottom">© 2026 Windows Scoped Remote MCP Server · Open Source</div></div></footer></q-page-container>
   </q-layout>
 </template>
 
@@ -45,5 +45,5 @@ onMounted(() => applyTheme(localStorage.getItem('wsr-theme') !== 'light'))
 .lang-menu { background:var(--wsr-surface);color:var(--wsr-text);border:1px solid var(--wsr-line); }
 .github-btn { border:1px solid var(--wsr-line);border-radius:20px;padding:9px 15px;color:var(--wsr-muted);text-decoration:none;font-size:12px;font-weight:650;transition:.2s; }
 .github-btn:hover { color:var(--wsr-text);border-color:var(--wsr-muted-2); }
-@media(max-width:700px){.site-toolbar{width:calc(100% - 32px)}.desktop-nav{display:none}.github-btn{display:none}}
+.site-footer{margin-top:80px;border-top:1px solid var(--wsr-line);background:var(--wsr-surface);color:var(--wsr-text)}.footer-inner{width:min(1160px,calc(100% - 48px));margin:auto;padding:42px 0 26px}.footer-brand{font-size:14px;font-weight:750;letter-spacing:.02em}.footer-copy{margin-top:8px;color:var(--wsr-muted);font-size:12px}.footer-links{display:flex;flex-wrap:wrap;gap:20px;margin-top:26px}.footer-links a{color:var(--wsr-muted);text-decoration:none;font-size:12px}.footer-links a:hover{color:var(--wsr-text)}.footer-links .sponsor-link{font-weight:700}.footer-bottom{margin-top:30px;padding-top:18px;border-top:1px solid var(--wsr-line);color:var(--wsr-muted-2);font-size:11px}@media(max-width:700px){.site-toolbar{width:calc(100% - 32px)}.desktop-nav{display:none}.github-btn{display:none}.footer-inner{width:calc(100% - 32px)}}
 </style>
