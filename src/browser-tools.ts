@@ -56,6 +56,40 @@ export function registerBrowserTools(
   );
 
   server.registerTool(
+    "browser_save_image",
+    {
+      title: "Save Browser Image",
+      description:
+        "Save a single visible image element from the current browser page as a PNG file inside the workspace, without the surrounding page UI.",
+      inputSchema: {
+        selector: z.string().min(1).describe("CSS selector matching the image element to save (e.g. 'img' or an image selector)"),
+        filePath: z.string().min(1).describe("Relative PNG file path inside the workspace (e.g. 'playwrite/meta-ai-generated.png')"),
+      },
+    },
+    async ({ selector, filePath }) =>
+      runTool(async () => {
+        return await browserManager.saveImage(selector, filePath);
+      }),
+  );
+
+  server.registerTool(
+    "browser_download",
+    {
+      title: "Browser Download",
+      description: "Click a download-capable element on the current page and save the browser's actual download to a workspace file.",
+      inputSchema: {
+        selector: z.string().min(1).describe("CSS selector for the download button or link"),
+        filePath: z.string().min(1).describe("Relative file path inside the workspace for the downloaded file"),
+        timeoutMs: z.number().int().min(1000).max(60000).default(30000).describe("Download timeout in milliseconds"),
+      },
+    },
+    async ({ selector, filePath, timeoutMs }) =>
+      runTool(async () => {
+        return await browserManager.download(selector, filePath, timeoutMs);
+      }),
+  );
+
+  server.registerTool(
     "browser_click",
     {
       title: "Browser Click Element",

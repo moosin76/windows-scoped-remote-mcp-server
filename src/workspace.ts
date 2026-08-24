@@ -147,6 +147,46 @@ export class WorkspaceManager {
     return this.getActiveWorkspace().path;
   }
 
+  getWorkspace(nameOrPath: string): WorkspaceItem {
+    const trimmed = nameOrPath.trim();
+    const lower = trimmed.toLowerCase();
+
+    if (this.workspaces.has(lower)) {
+      const wsPath = this.workspaces.get(lower)!;
+      return {
+        name: this.displayNames.get(lower) || lower,
+        path: wsPath,
+        isActive: lower === this.activeName,
+      };
+    }
+
+    const normalizedTarget = normalizeCanonicalPath(trimmed);
+    for (const [wsName, wsPath] of this.workspaces.entries()) {
+      if (wsPath.toLowerCase() === normalizedTarget.toLowerCase()) {
+        return {
+          name: this.displayNames.get(wsName) || wsName,
+          path: wsPath,
+          isActive: wsName === this.activeName,
+        };
+      }
+    }
+
+    const availableNames = Array.from(this.displayNames.values()).join(", ");
+    throw new Error(`Workspace '${nameOrPath}' not found. Available workspaces: ${availableNames}`);
+  }
+
+  resolveWorkspacePath(workspaceName: string, relativePath = "."): string {
+    const workspace = this.getWorkspace(workspaceName);
+    const resolved = path.resolve(workspace.path, relativePath);
+    const root = normalizeCanonicalPath(workspace.path);
+    const target = normalizeCanonicalPath(resolved);
+    const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+    if (target.toLowerCase() !== root.toLowerCase() && !target.toLowerCase().startsWith(prefix.toLowerCase())) {
+      throw new Error(`Path '${relativePath}' escapes workspace '${workspace.name}'.`);
+    }
+    return target;
+  }
+
   switchWorkspace(nameOrPath: string): WorkspaceItem {
     const trimmed = nameOrPath.trim();
     const lower = trimmed.toLowerCase();

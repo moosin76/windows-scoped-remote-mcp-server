@@ -124,6 +124,47 @@ export class BrowserManager {
     };
   }
 
+  async saveImage(selector: string, filePath: string) {
+    const page = await this.getPage();
+    const locator = page.locator(selector).first();
+    await locator.waitFor({ state: "visible", timeout: 10000 });
+
+    const resolvedPath = this.sandbox.resolveSafe(filePath);
+    const dir = path.dirname(resolvedPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    // Capture only the image element, not the surrounding page UI.
+    const buffer = await locator.screenshot({ type: "png" });
+    writeFileSync(resolvedPath, buffer);
+    return { savedToFile: resolvedPath, sizeBytes: buffer.length, selector, url: page.url() };
+  }
+
+  async download(selector: string, filePath: string, timeoutMs = 30000) {
+    const page = await this.getPage();
+    const locator = page.locator(selector).first();
+    await locator.waitFor({ state: "visible", timeout: timeoutMs });
+
+    const resolvedPath = this.sandbox.resolveSafe(filePath);
+    const dir = path.dirname(resolvedPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download", { timeout: timeoutMs }),
+      locator.click({ force: true, timeout: timeoutMs }),
+    ]);
+
+    await download.saveAs(resolvedPath);
+    return {
+      savedToFile: resolvedPath,
+      suggestedFilename: download.suggestedFilename(),
+      url: page.url(),
+    };
+  }
+
   async click(selector: string, timeoutMs = 10000) {
     const page = await this.getPage();
     await page.click(selector, { timeout: timeoutMs });

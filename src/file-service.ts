@@ -88,6 +88,18 @@ export class FileService {
     return this.#sandbox.resolveSafe(targetPath, baseDir);
   }
 
+  resolveWrite(targetPath: string, baseDir?: string): string {
+    const resolved = this.#sandbox.resolveSafe(targetPath, baseDir);
+    const activeRoot = this.#sandbox.workspaceRoot;
+    const normalizedRoot = path.resolve(activeRoot).toLowerCase();
+    const normalizedTarget = path.resolve(resolved).toLowerCase();
+    const prefix = normalizedRoot.endsWith(path.sep) ? normalizedRoot : `${normalizedRoot}${path.sep}`;
+    if (normalizedTarget !== normalizedRoot && !normalizedTarget.startsWith(prefix)) {
+      throw new Error(`Write denied: path is outside the active workspace (${activeRoot}). Other workspaces are read-only.`);
+    }
+    return resolved;
+  }
+
   async listDirectory(targetPath: string, options: ListDirectoryOptions = {}): Promise<{
     directory: string;
     relativePath: string;
@@ -272,7 +284,7 @@ export class FileService {
       createDirectories?: boolean;
     } = {},
   ): Promise<{ path: string; relativePath: string; bytesWritten: number }> {
-    const resolved = this.resolve(targetPath);
+    const resolved = this.resolveWrite(targetPath);
     const encoding = options.encoding ?? "utf8";
     const mode = options.mode ?? "overwrite";
     const buffer = decodeContent(content, encoding);
@@ -302,7 +314,7 @@ export class FileService {
     replacementString: string,
     options: { allowMultiple?: boolean } = {},
   ): Promise<{ path: string; relativePath: string; replacementsMade: number }> {
-    const resolved = this.resolve(targetPath);
+    const resolved = this.resolveWrite(targetPath);
     const stats = await stat(resolved);
     if (stats.size > this.#options.maxEditFileBytes) {
       throw new Error(`File size ${stats.size} exceeds maximum editable size of ${this.#options.maxEditFileBytes} bytes`);
@@ -343,7 +355,7 @@ export class FileService {
     patchContent: string,
     workdir?: string,
   ): Promise<{ success: boolean; output: string }> {
-    const cwd = workdir ? this.resolve(workdir) : this.workspaceRoot;
+    const cwd = workdir ? this.resolveWrite(workdir) : this.workspaceRoot;
     const tempPatchFile = path.join(this.workspaceRoot, `.patch_${randomUUID()}.diff`);
 
     try {
@@ -381,7 +393,7 @@ export class FileService {
   }
 
   async makeDirectory(targetPath: string): Promise<{ path: string; relativePath: string }> {
-    const resolved = this.resolve(targetPath);
+    const resolved = this.resolveWrite(targetPath);
     await mkdir(resolved, { recursive: true });
     return {
       path: resolved,
@@ -391,7 +403,7 @@ export class FileService {
 
   async copyPath(source: string, destination: string, overwrite = false): Promise<{ from: string; to: string }> {
     const src = this.resolve(source);
-    const dest = this.resolve(destination);
+    const dest = this.resolveWrite(destination);
 
     const stats = await stat(src);
     if (stats.isDirectory()) {
@@ -407,8 +419,8 @@ export class FileService {
   }
 
   async movePath(source: string, destination: string): Promise<{ from: string; to: string }> {
-    const src = this.resolve(source);
-    const dest = this.resolve(destination);
+    const src = this.resolveWrite(source);
+    const dest = this.resolveWrite(destination);
     await rename(src, dest);
     return {
       from: path.relative(this.workspaceRoot, src),
@@ -417,7 +429,7 @@ export class FileService {
   }
 
   async removePath(targetPath: string, recursive = false): Promise<{ path: string; relativePath: string }> {
-    const resolved = this.resolve(targetPath);
+    const resolved = this.resolveWrite(targetPath);
     if (resolved === this.workspaceRoot) {
       throw new Error("Cannot delete the workspace root itself!");
     }
