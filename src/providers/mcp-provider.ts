@@ -30,19 +30,21 @@ export class RemoteMcpProvider implements McpProvider {
   readonly namespace: string;
 
   private readonly url: URL;
-  private readonly client: Client;
+  private readonly clientName: string;
+  private readonly clientVersion: string;
+  private readonly requestInit?: RequestInit;
+  private client?: Client;
   private transport?: StreamableHTTPClientTransport;
   private connected = false;
   private _lastError?: string;
+  private connecting?: Promise<void>;
 
   constructor(options: RemoteMcpProviderOptions) {
     this.id = options.id;
     this.namespace = options.namespace;
     this.url = new URL(options.url);
-    this.client = new Client({
-      name: options.clientName ?? "windows-scoped-remote-mcp-gateway",
-      version: options.clientVersion ?? "1.0.0",
-    });
+    this.clientName = options.clientName ?? "windows-scoped-remote-mcp-gateway";
+    this.clientVersion = options.clientVersion ?? "1.0.0";
     this.requestInit = options.requestInit;
   }
 
@@ -50,22 +52,31 @@ export class RemoteMcpProvider implements McpProvider {
     return this._lastError;
   }
 
-  private readonly requestInit?: RequestInit;
-
   async connect(): Promise<void> {
     if (this.connected) return;
+    if (this.connecting) return this.connecting;
 
-    const transport = new StreamableHTTPClientTransport(this.url, {
-      requestInit: this.requestInit,
-    });
+    this.connecting = this.createConnection();
+    try {
+      await this.connecting;
+    } finally {
+      this.connecting = undefined;
+    }
+  }
+
+  private async createConnection(): Promise<void> {
+    const client = new Client({ name: this.clientName, version: this.clientVersion });
+    const transport = new StreamableHTTPClientTransport(this.url, { requestInit: this.requestInit });
 
     try {
-      await this.client.connect(transport);
+      await client.connect(transport);
+      this.client = client;
       this.transport = transport;
       this.connected = true;
       this._lastError = undefined;
     } catch (error) {
       await transport.close().catch(() => undefined);
+      await client.close().catch(() => undefined);
       this.connected = false;
       this._lastError = error instanceof Error ? error.message : String(error);
       throw error;
@@ -75,7 +86,9 @@ export class RemoteMcpProvider implements McpProvider {
   async close(): Promise<void> {
     this.connected = false;
     this.transport = undefined;
-    await this.client.close().catch(() => undefined);
+    const client = this.client;
+    this.client = undefined;
+    await client?.close().catch(() => undefined);
   }
 
   isConnected(): boolean {
@@ -85,10 +98,10 @@ export class RemoteMcpProvider implements McpProvider {
   async listTools(): Promise<readonly Tool[]> {
     await this.ensureConnected();
     try {
-      const result = await this.client.listTools();
+      const result = await this.client!.listTools();
       return result.tools;
     } catch (error) {
-      this.markDisconnected(error);
+      await this.markDisconnected(error);
       throw this.unavailableError(error);
     }
   }
@@ -96,9 +109,9 @@ export class RemoteMcpProvider implements McpProvider {
   async callTool(name: string, args: Record<string, unknown> = {}): Promise<Awaited<ReturnType<Client["callTool"]>>> {
     await this.ensureConnected();
     try {
-      return await this.client.callTool({ name, arguments: args });
+      return await this.client!.callTool({ name, arguments: args });
     } catch (error) {
-      this.markDisconnected(error);
+      await this.markDisconnected(error);
       throw this.unavailableError(error);
     }
   }
@@ -124,10 +137,13 @@ export class RemoteMcpProvider implements McpProvider {
     }
   }
 
-  private markDisconnected(error: unknown): void {
+  private async markDisconnected(error: unknown): Promise<void> {
     this.connected = false;
     this._lastError = error instanceof Error ? error.message : String(error);
+    const client = this.client;
+    this.client = undefined;
     this.transport = undefined;
+    await client?.close().catch(() => undefined);
   }
 
   private unavailableError(cause?: unknown): Error {

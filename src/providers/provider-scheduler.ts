@@ -8,13 +8,7 @@ export interface ProviderSchedulerOptions {
   onToolsChanged?: (providerId: string) => void;
 }
 
-/**
- * Background scheduler for optional remote MCP providers.
- *
- * It periodically checks connected providers and retries unavailable ones.
- * Tool snapshots are refreshed only when the remote tool definition changes.
- * A single provider failure is isolated and never stops the WSR gateway.
- */
+/** Background scheduler for optional remote MCP providers. */
 export class ProviderScheduler {
   private readonly registry: ProviderRegistry;
   private readonly intervalMs: number;
@@ -25,6 +19,7 @@ export class ProviderScheduler {
   private polling = false;
   private readonly nextRetryAt = new Map<string, number>();
   private readonly snapshotHashes = new Map<string, string>();
+  private readonly knownConnectionStates = new Map<string, boolean>();
 
   constructor(registry: ProviderRegistry, options: ProviderSchedulerOptions = {}) {
     this.registry = registry;
@@ -76,17 +71,18 @@ export class ProviderScheduler {
             const changed = await this.refreshAndDetectChange(provider.id);
             this.nextRetryAt.delete(provider.id);
             if (changed) this.onToolsChanged?.(provider.id);
-            console.log(`[MCP Provider Scheduler] '${provider.id}' connected (${this.registry.listCachedTools().filter((tool) => tool.providerId === provider.id).length} tools)`);
+            this.recordConnected(provider.id);
           } catch (error) {
             this.nextRetryAt.set(provider.id, Date.now() + this.retryIntervalMs);
             nextDelay = Math.min(nextDelay, this.retryIntervalMs);
-            console.warn(`[MCP Provider Scheduler] '${provider.id}' unavailable: ${error instanceof Error ? error.message : String(error)}`);
+            this.recordDisconnected(provider.id, error);
           }
           continue;
         }
 
         try {
           const changed = await this.refreshAndDetectChange(provider.id);
+          this.recordConnected(provider.id);
           if (changed) {
             this.onToolsChanged?.(provider.id);
             console.log(`[MCP Provider Scheduler] '${provider.id}' tool list changed`);
@@ -94,12 +90,34 @@ export class ProviderScheduler {
         } catch (error) {
           this.nextRetryAt.set(provider.id, Date.now() + this.retryIntervalMs);
           nextDelay = Math.min(nextDelay, this.retryIntervalMs);
-          console.warn(`[MCP Provider Scheduler] '${provider.id}' health check failed: ${error instanceof Error ? error.message : String(error)}`);
+          this.recordDisconnected(provider.id, error);
         }
       }
     } finally {
       this.polling = false;
       this.schedule(nextDelay);
+    }
+  }
+
+  private recordConnected(providerId: string): void {
+    const wasConnected = this.knownConnectionStates.get(providerId);
+    this.knownConnectionStates.set(providerId, true);
+
+    if (wasConnected !== true) {
+      const count = this.registry.listCachedTools().filter((tool) => tool.providerId === providerId).length;
+      console.log(`[MCP Provider Scheduler] '${providerId}' connected (${count} tools)`);
+    }
+  }
+
+  private recordDisconnected(providerId: string, error: unknown): void {
+    const wasConnected = this.knownConnectionStates.get(providerId);
+    this.knownConnectionStates.set(providerId, false);
+
+    // Only report a transition from connected -> disconnected.
+    // Repeated unavailable -> unavailable checks stay silent.
+    if (wasConnected === true) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[MCP Provider Scheduler] '${providerId}' disconnected: ${message}`);
     }
   }
 
