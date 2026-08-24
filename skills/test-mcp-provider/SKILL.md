@@ -1,4 +1,4 @@
-﻿# MCP Provider 테스트 스킬
+# MCP Provider 테스트 스킬
 
 ## 최소 테스트
 
@@ -63,3 +63,16 @@ ChatGPT tool refresh
   ↓
 real tool call
 ```
+
+
+## PostgreSQL SSE 회귀 테스트
+
+PostgreSQL Provider를 변경한 경우 다음을 추가로 검증한다.
+
+1. `mcp_provider_status`에서 `postgresql`이 connected이고 toolCount가 9인지 확인.
+2. `list_schemas` 호출 성공 확인.
+3. `list_objects`를 사용자 스키마에 호출해 실제 객체 목록이 반환되는지 확인.
+4. Godot Provider가 계속 Streamable HTTP로 연결되고 기존 toolCount가 유지되는지 확인.
+5. 전체 remote tool 수가 현재 기준 54(45 + 9)인지 확인.
+
+네트워크 의존 검증과 별개로 `npm run typecheck`, `npm test`, `git diff --check`는 반드시 실행한다.

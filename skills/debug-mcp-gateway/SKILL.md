@@ -1,4 +1,4 @@
-﻿# MCP Gateway 장애 분석 스킬
+# MCP Gateway 장애 분석 스킬
 
 ## 목적
 
@@ -116,3 +116,18 @@ WSR 전체가 종료되는지부터 확인하지 말고 다음 순서로 확인�
 5. Provider를 다시 시작한 뒤 필요한 경우 WSR을 재시작하거나 도구 목록을 새로 고침
 
 Provider 연결 실패는 WSR Gateway 전체 장애로 취급하지 않습니다.
+
+
+## SSE endpoint 405 진단
+
+legacy SSE endpoint에 Streamable HTTP transport로 연결하면 `POST /sse` 요청이 발생하면서 `405 Method Not Allowed`가 반복될 수 있다.
+
+이 경우 다음 순서로 확인한다.
+
+1. Provider URL이 실제로 `/sse` endpoint인지 확인.
+2. Provider 등록의 `transport`가 `"sse"`인지 확인.
+3. PostgreSQL Docker 로그에서 `POST /sse 405`가 사라졌는지 확인.
+4. `mcp_provider_status`에서 PostgreSQL이 connected / 9 tools인지 확인.
+5. `list_schemas` 또는 `list_objects`를 실제 호출해 응답을 확인.
+
+Godot처럼 `/mcp` Streamable HTTP Provider에는 이 해결책을 적용하지 않는다.

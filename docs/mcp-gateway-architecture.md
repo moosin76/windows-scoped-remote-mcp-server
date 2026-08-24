@@ -1,4 +1,4 @@
-﻿# MCP Gateway 아키텍처 메모
+# MCP Gateway 아키텍처 메모
 
 ## 현재 구조
 
@@ -156,3 +156,22 @@ MCP_PROVIDER_RETRY_INTERVAL_MS=5000
 Tool 정의가 변경되면 Registry snapshot을 갱신한다. `createMcpHandler` factory가 요청마다 MCP Server를 구성하므로 다음 `tools/list` 요청에 최신 tool 목록이 반영된다.
 
 MCP 세션을 장기간 유지하면서 즉시 `tools/list_changed` notification을 전달해야 하는 경우에는 향후 세션 관리 구조와 함께 별도로 구현한다.
+
+
+## Provider별 outbound transport
+
+WSR의 inbound MCP 서버는 SDK v2 split packages를 사용하지만, Remote Provider의 outbound transport는 Provider 특성에 따라 다르게 선택할 수 있다.
+
+```text
+RemoteMcpProvider
+├─ streamable-http
+│  └─ @modelcontextprotocol/client 2.x
+│     └─ Godot MCP /mcp
+└─ sse
+   └─ @modelcontextprotocol/sdk 1.x compatibility client
+      └─ CrystalDBA postgres-mcp /sse
+```
+
+현재 `@modelcontextprotocol/client 2.0.0`에는 legacy `SSEClientTransport`가 노출되지 않으므로 SSE Provider 호환성은 `@modelcontextprotocol/sdk 1.30.0`을 병행 사용한다. 이 호환 계층은 outbound Provider 연결에만 사용하며 WSR inbound의 MCP 2026-07-28 지원을 되돌리지 않는다.
+
+검증된 Provider 구성은 Godot 45 tools + PostgreSQL 9 tools = 총 54 remote tools이다. Provider 상태는 `mcp_provider_status`로 확인한다.

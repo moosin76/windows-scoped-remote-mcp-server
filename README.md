@@ -1,4 +1,4 @@
-﻿# 🛡️ Windows Scoped Remote MCP Server
+# 🛡️ Windows Scoped Remote MCP Server
 
 Windows 환경에서 동작하는 **보안 격리형 원격 개발 MCP(Model Context Protocol) 서버**입니다.
 
@@ -350,3 +350,26 @@ WSR은 개발 자동화를 위해 강력한 기능을 제공하므로 다음 원
 ## License
 
 MIT License
+
+
+## PostgreSQL MCP (CrystalDBA)
+
+WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재 검증된 구성은 다음과 같습니다.
+
+| Provider | Endpoint | Transport | Tools |
+| --- | --- | --- | ---: |
+| Godot | `http://127.0.0.1:8000/mcp` | Streamable HTTP | 45 |
+| PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
+
+PostgreSQL Provider를 활성화하려면 루트 `.env`에 다음 값을 설정합니다.
+
+```env
+MCP_POSTGRESQL_ENABLED=true
+MCP_POSTGRESQL_URL=http://127.0.0.1:10021/sse
+```
+
+Docker 실행 환경은 `mcp-servers/postgres-mcp/`에 있으며 실제 `DATABASE_URI`는 해당 디렉터리의 `.env`에만 둡니다. DB 비밀번호나 실제 연결 문자열은 Git에 커밋하지 않습니다.
+
+PostgreSQL MCP가 제공하는 9개 도구는 WSR namespace 적용 후 `postgresql_*` 형태로 노출됩니다. 실제 연결에서는 `list_schemas`, `list_objects`, `get_object_details`, `explain_query`, `analyze_workload_indexes`, `analyze_query_indexes`, `analyze_db_health`, `get_top_queries`, `execute_sql`을 확인했습니다.
+
+자세한 설치/운영 방법은 `docs/postgresql-mcp-provider.md`와 `mcp-servers/postgres-mcp/README.md`를 참고하세요.

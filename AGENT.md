@@ -1,4 +1,4 @@
-﻿# Windows Scoped Remote MCP Server 작업 지침
+# Windows Scoped Remote MCP Server 작업 지침
 
 ## 프로젝트 목적
 
@@ -195,3 +195,22 @@ Remote MCP Provider는 선택적 의존성으로 취급한다. 하나의 Provide
 Provider tool 호출이 실패할 경우 Gateway를 종료하지 말고 사용자에게 Provider가 unavailable임을 명확하게 반환한다.
 
 현재 WSR은 요청마다 MCP Server를 구성하므로 Scheduler가 갱신한 Registry snapshot은 다음 `tools/list` 요청에 반영된다. 장기 세션과 `tools/list_changed` notification은 별도의 세션 관리 작업으로 다룬다.
+
+
+## PostgreSQL MCP 운영 규칙
+
+- PostgreSQL Provider는 CrystalDBA `postgres-mcp`를 사용하며 현재 transport는 legacy SSE이다.
+- Godot Provider의 Streamable HTTP 설정을 PostgreSQL 때문에 변경하지 않는다. Provider별 transport를 명시적으로 선택한다.
+- PostgreSQL 기본 endpoint는 `http://127.0.0.1:10021/sse`이다.
+- 실제 `DATABASE_URI`, DB 계정, 비밀번호는 `.env`에만 저장하고 Git에 커밋하지 않는다.
+- 운영 DB에서는 `restricted`와 최소권한 계정을 우선한다. 개발/참고용 DB에서만 필요에 따라 `unrestricted`를 사용한다.
+- Provider 추가/수정 후에는 `npm run typecheck`, `npm test`, `git diff --check`를 수행한다.
+- 실제 연결 검증 시 `mcp_provider_status`에서 Provider별 connected/toolCount를 확인하고, PostgreSQL은 최소 `list_schemas`와 `list_objects`를 호출한다.
+
+## 문서 인코딩 규칙
+
+- 모든 프로젝트 문서는 **UTF-8**로 저장한다.
+- Markdown, YAML, JSON, 환경 변수 예제 등 텍스트 문서는 UTF-8을 기본 인코딩으로 사용한다.
+- 새 문서를 만들거나 기존 문서를 수정할 때 한글이 `?`, `U+FFFD` 등으로 깨지지 않았는지 확인한다.
+- 가능하면 UTF-8 BOM 없이 저장한다. 기존 파일의 BOM은 특별한 호환성 이유가 없다면 제거한다.
+- 문서 작업 후에는 UTF-8 디코딩 검사를 수행하고, 인코딩 오류나 replacement character(`U+FFFD`)가 없는지 확인한다.

@@ -1,0 +1,12 @@
+services:
+  postgres-mcp:
+    image: crystaldba/postgres-mcp:latest
+    container_name: wsr-postgres-mcp
+    restart: unless-stopped
+    environment:
+      DATABASE_URI: ${DATABASE_URI}
+    command:
+      - --access-mode=${POSTGRES_MCP_ACCESS_MODE:-unrestricted}
+      - --transport=sse
+    ports:
+      - "${POSTGRES_MCP_PORT:-10021}:8000"

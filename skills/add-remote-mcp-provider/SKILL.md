@@ -1,4 +1,4 @@
-﻿# 새로운 MCP Provider 추가 Skill
+# 새로운 MCP Provider 추가 Skill
 
 ## 목적
 
@@ -241,3 +241,24 @@ feat: add <provider> MCP integration
 - 인증정보와 토큰을 Git에 커밋하지 않는다.
 - Scheduler는 비동기 백그라운드 작업이며 MCP 요청을 막아서는 안 된다.
 - 실패한 health check는 경고로 처리하고 다음 주기에 다시 시도한다.
+
+
+## Transport 선택 규칙
+
+Provider를 추가할 때 endpoint URL만 보고 transport를 추측하지 않는다. 서버가 Streamable HTTP인지 legacy SSE인지 먼저 확인한다.
+
+- Streamable HTTP: 기본값 `transport: "streamable-http"`, 현재 Godot에서 사용.
+- legacy SSE: `transport: "sse"`, 현재 CrystalDBA postgres-mcp에서 사용.
+
+`@modelcontextprotocol/client 2.x`에는 legacy SSE transport가 없으므로 WSR은 SSE Provider에 한해 `@modelcontextprotocol/sdk 1.x` compatibility client를 사용한다. 신규 Provider가 SSE라면 이 경로를 재사용하고 Godot의 Streamable HTTP 경로를 변경하지 않는다.
+
+PostgreSQL 예:
+
+```ts
+new RemoteMcpProvider({
+  id: "postgresql",
+  namespace: "postgresql",
+  url: config.postgresqlMcpUrl,
+  transport: "sse",
+});
+```
