@@ -1,0 +1,44 @@
+@echo off
+setlocal
+title Windows Scoped Remote MCP Server
+cd /d "%~dp0"
+
+echo ============================================================
+echo   Starting Windows Scoped Remote MCP Server
+echo ============================================================
+
+:: 1. Check if node_modules exists, install if missing
+if not exist "node_modules" (
+    echo [*] Installing dependencies...
+    call npm install
+    if errorlevel 1 (
+        echo [!] Failed to install dependencies.
+        pause
+        exit /b 1
+    )
+)
+
+:: 2. Check if .env exists, copy from .env.example if missing
+if not exist ".env" (
+    echo [*] Creating .env from .env.example...
+    copy .env.example .env
+    echo [!] Please configure your .env file with your settings.
+)
+
+:: 3. Check if bin\cloudflared.exe exists, download automatically if missing
+if not exist "bin\cloudflared.exe" (
+    echo [*] bin\cloudflared.exe not found. Downloading latest Cloudflare Tunnel binary...
+    if not exist "bin" mkdir "bin"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Write-Host 'Downloading cloudflared.exe from GitHub...'; Invoke-WebRequest -Uri 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' -OutFile 'bin\cloudflared.exe'"
+    if exist "bin\cloudflared.exe" (
+        echo [OK] cloudflared.exe downloaded successfully.
+    ) else (
+        echo [!] Download failed or skipped. You can manually download cloudflared.exe and place it in the bin\ folder.
+    )
+)
+
+:: 4. Run Server using tsx dev mode
+echo [*] Starting MCP Server...
+call npx tsx src/server.ts
+
+pause

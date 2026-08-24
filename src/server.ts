@@ -1,0 +1,77 @@
+import { loadConfig } from "./config.js";
+import { SandboxGuard } from "./sandbox.js";
+import { FileService } from "./file-service.js";
+import { ProcessManager } from "./process-manager.js";
+import { startHttpServer } from "./http-server.js";
+import { startCloudflareTunnel } from "./tunnel.js";
+import { WorkspaceManager } from "./workspace.js";
+
+async function main() {
+  const config = loadConfig(process.env, process.cwd());
+  const projectRoot = process.cwd();
+  const workspaceManager = new WorkspaceManager(config.workspaceRoots);
+  const activeWs = workspaceManager.getActiveWorkspace();
+
+  console.log("============================================================");
+  console.log("  Windows Scoped Remote MCP Server");
+  console.log("============================================================");
+  console.log(`📁 Active Workspace: ${activeWs.name} (${activeWs.path})`);
+  console.log(`📚 All Workspaces:   ${workspaceManager.getAllWorkspaces().map(w => `${w.name} -> ${w.path}`).join(" | ")}`);
+  console.log(`🐚 Default Shell:    ${config.defaultShell}`);
+  console.log(`🔒 Sandbox Guard:    Active (${workspaceManager.getAllRoots().length} Multi-Root Workspaces Contained)`);
+  console.log(`🔌 Local Endpoint:   http://localhost:${config.port}${config.endpoint}`);
+  if (config.publicUrl) {
+    console.log(`🌐 Public Endpoint:  ${config.publicUrl}${config.endpoint}`);
+  }
+  console.log(`❤️  Health Check:    http://localhost:${config.port}/health`);
+  if (config.authToken) {
+    console.log(`🔑 Bearer Token:     ${config.authToken}`);
+  } else {
+    console.log(`⚠️  Bearer Token:     None (Anonymous Mode)`);
+  }
+  console.log("============================================================\n");
+
+  const sandbox = new SandboxGuard(workspaceManager);
+
+  const processManager = new ProcessManager({
+    maxProcesses: config.maxProcesses,
+    maxRetainedOutputBytes: config.maxRetainedProcessOutputBytes,
+    processRetentionMs: config.processRetentionMs,
+    defaultMaxOutputBytes: config.maxOutputBytes,
+  });
+
+  const fileService = new FileService({
+    sandbox,
+    maxChunkBytes: config.maxFileChunkBytes,
+    maxEditFileBytes: config.maxEditFileBytes,
+    maxOutputBytes: config.maxOutputBytes,
+  });
+
+  const runningServer = await startHttpServer(config, processManager, fileService, workspaceManager);
+  console.log(`[HTTP Server] Listening on ${config.host}:${config.port}`);
+
+  let tunnel: Awaited<ReturnType<typeof startCloudflareTunnel>> | undefined;
+  try {
+    tunnel = await startCloudflareTunnel(config, projectRoot);
+  } catch (err) {
+    console.warn(`[Tunnel Warning] Could not start Cloudflare Tunnel: ${(err as Error).message}`);
+    console.log("ℹ️  You can still connect to the local endpoint or run cloudflared manually.");
+  }
+
+  const shutdown = async () => {
+    console.log("\n[Server] Shutting down gracefully...");
+    if (tunnel) {
+      tunnel.stop();
+    }
+    await runningServer.close().catch(() => {});
+    process.exit(0);
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+main().catch((err) => {
+  console.error("[Fatal Error]", err);
+  process.exit(1);
+});
