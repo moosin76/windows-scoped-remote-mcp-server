@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+﻿import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { AppConfig } from "./config.js";
@@ -65,6 +65,7 @@ export async function startCloudflareTunnel(
   });
 
   let publicUrl = config.publicUrl;
+  let fixedTunnelAnnounced = false;
 
   const urlRegex = /https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/;
 
@@ -77,31 +78,29 @@ export async function startCloudflareTunnel(
       publicUrl = match[0];
       console.log(`\n============================================================`);
       console.log(` [Cloudflare Quick Tunnel Connected!]`);
-      console.log(` 🌐 Public URL:    ${publicUrl}`);
-      console.log(` 🔌 MCP Endpoint:  ${publicUrl}${config.endpoint}`);
+      console.log(` ?뙋 Public URL:    ${publicUrl}`);
+      console.log(` ?뵆 MCP Endpoint:  ${publicUrl}${config.endpoint}`);
       if (config.authToken) {
-        console.log(` 🔑 Auth Header:   Authorization: Bearer ${config.authToken}`);
+        console.log(` ?뵎 Auth Header:   Authorization: Bearer ${config.authToken}`);
       }
       console.log(`============================================================\n`);
     }
 
     // Named tunnel connection success detection
-    if (text.includes("Registered tunnel connection") || text.includes("Connection registered")) {
+    if (!fixedTunnelAnnounced && (text.includes("Registered tunnel connection") || text.includes("Connection registered"))) {
       console.log(`\n============================================================`);
-      console.log(` [Cloudflare Fixed Tunnel Connected & Active!] 🚀`);
+      console.log(` [Cloudflare Fixed Tunnel Connected & Active!] ??`);
       if (config.publicUrl) {
-        console.log(` 🌐 Public URL:    ${config.publicUrl}`);
-        console.log(` 🔌 MCP Endpoint:  ${config.publicUrl}${config.endpoint}`);
+        console.log(` ?뙋 Public URL:    ${config.publicUrl}`);
+        console.log(` ?뵆 MCP Endpoint:  ${config.publicUrl}${config.endpoint}`);
       }
       if (config.authToken) {
-        console.log(` 🔑 Auth Header:   Authorization: Bearer ${config.authToken}`);
+        console.log(` ?뵎 Auth Header:   Authorization: Bearer ${config.authToken}`);
       }
-      console.log(`============================================================\n`);
+      console.log(`============================================================\\n`);
+      fixedTunnelAnnounced = true;
     }
   };
-
-  child.stdout?.on("data", checkOutput);
-  child.stderr?.on("data", checkOutput);
 
   child.on("error", (err) => {
     console.error(`[Tunnel Error] Failed to start cloudflared: ${err.message}`);
@@ -125,3 +124,6 @@ export async function startCloudflareTunnel(
     stop,
   };
 }
+
+
+
