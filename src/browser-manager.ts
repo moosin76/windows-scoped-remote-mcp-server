@@ -1,16 +1,27 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type BrowserContext, type Page } from "playwright";
 import path from "node:path";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import type { SandboxGuard } from "./sandbox.js";
 
 export class BrowserManager {
-  private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private headless: boolean;
+  private userDataDir: string;
 
-  constructor(private readonly sandbox: SandboxGuard, headless = true) {
+  constructor(
+    private readonly sandbox: SandboxGuard,
+    headless = false,
+    userDataDir?: string,
+  ) {
     this.headless = headless;
+    this.userDataDir =
+      userDataDir || path.resolve(process.cwd(), ".browser-profile");
+    if (!existsSync(this.userDataDir)) {
+      try {
+        mkdirSync(this.userDataDir, { recursive: true });
+      } catch {}
+    }
   }
 
   async setHeadless(headless: boolean): Promise<void> {
@@ -25,41 +36,49 @@ export class BrowserManager {
       return this.page;
     }
 
-    if (!this.browser || !this.browser.isConnected()) {
+    if (!this.context) {
+      const launchOptions = {
+        headless: this.headless,
+        viewport: { width: 1280, height: 720 },
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-blink-features=AutomationControlled",
+        ],
+        ignoreDefaultArgs: ["--enable-automation"],
+      };
+
       try {
-        // 1. Try standard bundled chromium
-        this.browser = await chromium.launch({
-          headless: this.headless,
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        // 1. Try Microsoft Edge preinstalled on Windows (preserves Edge/Chrome sessions)
+        this.context = await chromium.launchPersistentContext(this.userDataDir, {
+          ...launchOptions,
+          channel: "msedge",
         });
       } catch {
         try {
-          // 2. Fallback to Windows preinstalled Microsoft Edge
-          this.browser = await chromium.launch({
-            channel: "msedge",
-            headless: this.headless,
-            args: ["--no-sandbox"],
+          // 2. Fallback to Google Chrome preinstalled
+          this.context = await chromium.launchPersistentContext(this.userDataDir, {
+            ...launchOptions,
+            channel: "chrome",
           });
         } catch {
-          // 3. Fallback to Google Chrome
-          this.browser = await chromium.launch({
-            channel: "chrome",
-            headless: this.headless,
-            args: ["--no-sandbox"],
+          // 3. Fallback to bundled Chromium
+          this.context = await chromium.launchPersistentContext(this.userDataDir, {
+            ...launchOptions,
           });
         }
       }
     }
 
-    if (!this.context) {
-      this.context = await this.browser.newContext({
-        viewport: { width: 1280, height: 720 },
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      });
+    const pages = this.context.pages();
+    if (pages.length > 0 && !pages[0].isClosed()) {
+      this.page = pages[0];
+    } else {
+      this.page = await this.context.newPage();
     }
 
-    this.page = await this.context.newPage();
     return this.page;
   }
 
@@ -75,6 +94,7 @@ export class BrowserManager {
       url: page.url(),
       title,
       status: response?.status() ?? 200,
+      loginSessionPersisted: true,
     };
   }
 
@@ -148,10 +168,6 @@ export class BrowserManager {
     if (this.context) {
       await this.context.close().catch(() => {});
       this.context = null;
-    }
-    if (this.browser) {
-      await this.browser.close().catch(() => {});
-      this.browser = null;
     }
     return { status: "closed" };
   }

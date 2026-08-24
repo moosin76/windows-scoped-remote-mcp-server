@@ -34,7 +34,11 @@ async function main() {
   console.log("============================================================\n");
 
   const sandbox = new SandboxGuard(workspaceManager);
-  const browserManager = new BrowserManager(sandbox, config.browserHeadless);
+  const browserManager = new BrowserManager(
+    sandbox,
+    config.browserHeadless,
+    config.browserUserDataDir,
+  );
 
   const processManager = new ProcessManager({
     maxProcesses: config.maxProcesses,

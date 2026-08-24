@@ -17,6 +17,10 @@ dist/
 *.tmp
 *.tmp.*
 
+# Browser Profile (Persistent Cookies & Login Sessions)
+.browser-profile/
+*.profile/
+
 # Cloudflare Tunnel Binaries & Certificates
 bin/
 *.exe

@@ -34,6 +34,7 @@ export interface AppConfig {
   maxFileChunkBytes: number;
   maxEditFileBytes: number;
   browserHeadless: boolean;
+  browserUserDataDir: string;
   cloudflareTunnelToken: string | undefined;
 }
 
@@ -164,6 +165,9 @@ export function loadConfig(
     maxFileChunkBytes: parseInteger(env.MCP_MAX_FILE_CHUNK_BYTES, 1024 * 1024, "MCP_MAX_FILE_CHUNK_BYTES", 4096),
     maxEditFileBytes: parseInteger(env.MCP_MAX_EDIT_FILE_BYTES, 64 * 1024 * 1024, "MCP_MAX_EDIT_FILE_BYTES", 4096),
     browserHeadless: parseBoolean(env.MCP_BROWSER_HEADLESS, false),
+    browserUserDataDir: path.resolve(
+      env.MCP_BROWSER_USER_DATA_DIR?.trim() || path.join(processCwd, ".browser-profile"),
+    ),
     cloudflareTunnelToken,
   };
 }
