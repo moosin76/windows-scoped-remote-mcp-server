@@ -36,6 +36,8 @@ export interface AppConfig {
   browserHeadless: boolean;
   browserUserDataDir: string;
   cloudflareTunnelToken: string | undefined;
+  godotMcpEnabled: boolean;
+  godotMcpUrl: string;
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -113,6 +115,8 @@ export function loadConfig(
   }
 
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
+  const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
+  const godotMcpUrl = env.MCP_GODOT_URL?.trim() || "http://127.0.0.1:8000/mcp";
 
   return {
     host: env.MCP_HOST?.trim() || "0.0.0.0",
@@ -169,5 +173,7 @@ export function loadConfig(
       env.MCP_BROWSER_USER_DATA_DIR?.trim() || path.join(processCwd, ".browser-profile"),
     ),
     cloudflareTunnelToken,
+    godotMcpEnabled,
+    godotMcpUrl,
   };
 }

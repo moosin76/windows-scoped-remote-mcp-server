@@ -78,6 +78,10 @@ export class ProviderRegistry {
     return [...this.toolSnapshots.values()].flat();
   }
 
+  /** Return the last discovered tool snapshot without performing network I/O. */
+  listCachedTools(): readonly NamespacedTool[] {
+    return [...this.toolSnapshots.values()].flat();
+  }
   resolve(namespacedName: string): { provider: McpProvider; remoteName: string } {
     for (const provider of this.providers.values()) {
       if (namespacedName.startsWith(`${provider.namespace}_`)) {

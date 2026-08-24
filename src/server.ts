@@ -6,6 +6,7 @@ import { startHttpServer } from "./http-server.js";
 import { startCloudflareTunnel } from "./tunnel.js";
 import { WorkspaceManager } from "./workspace.js";
 import { BrowserManager } from "./browser-manager.js";
+import { createProviderRegistry } from "./providers/provider-factory.js";
 
 async function main() {
   const config = loadConfig(process.env, process.cwd());
@@ -47,6 +48,13 @@ async function main() {
     defaultMaxOutputBytes: config.maxOutputBytes,
   });
 
+  const providerRegistry = createProviderRegistry(config);
+  if (providerRegistry.list().length > 0) {
+    console.log(`[MCP Providers] Connecting ${providerRegistry.list().length} provider(s)...`);
+    await providerRegistry.connectAll();
+    console.log(`[MCP Providers] Ready (${providerRegistry.listCachedTools().length} remote tools)`);
+  }
+
   const fileService = new FileService({
     sandbox,
     maxChunkBytes: config.maxFileChunkBytes,
@@ -76,6 +84,7 @@ async function main() {
     if (tunnel) {
       tunnel.stop();
     }
+    await providerRegistry.closeAll().catch(() => {});
     await browserManager.close().catch(() => {});
     await runningServer.close().catch(() => {});
     process.exit(0);

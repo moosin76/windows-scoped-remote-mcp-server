@@ -9,6 +9,8 @@ import { registerCrossWorkspaceTools } from "./workspace-cross-tools.js";
 import { registerBrowserTools } from "./browser-tools.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
+import type { ProviderRegistry } from "./providers/provider-registry.js";
+import { registerProviderTools } from "./providers/provider-tools.js";
 
 export function createMcpServer(
   config: AppConfig,
@@ -16,6 +18,7 @@ export function createMcpServer(
   fileService: FileService,
   workspaceManager?: WorkspaceManager,
   browserManager?: BrowserManager,
+  providerRegistry?: ProviderRegistry,
 ): McpServer {
   const server = new McpServer(
     {
@@ -37,5 +40,8 @@ export function createMcpServer(
   if (browserManager) registerBrowserTools(server, browserManager);
   registerExecTools(server, config, processManager, fileService);
   registerFileTools(server, config, fileService);
+  if (providerRegistry) {
+    registerProviderTools(server, providerRegistry, providerRegistry.listCachedTools());
+  }
   return server;
 }

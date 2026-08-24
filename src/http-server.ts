@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import type { Server as HttpServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createOAuthMetadata, mcpAuthRouter, type AuthRouterOptions } from "@modelcontextprotocol/sdk/server/auth/router.js";
@@ -14,6 +14,7 @@ import { RemoteDevOAuthProvider, OAUTH_SCOPES } from "./oauth.js";
 import { generateOpenApiSpec, generateAiPluginManifest } from "./openapi.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
+import type { ProviderRegistry } from "./providers/provider-registry.js";
 
 export interface RunningHttpServer {
   httpServer: HttpServer;
@@ -34,6 +35,7 @@ export async function startHttpServer(
   fileService: FileService,
   workspaceManager?: WorkspaceManager,
   browserManager?: BrowserManager,
+  providerRegistry?: ProviderRegistry,
 ): Promise<RunningHttpServer> {
   const app = express();
   app.disable("x-powered-by");
@@ -257,6 +259,7 @@ export async function startHttpServer(
       fileService,
       workspaceManager,
       browserManager,
+      providerRegistry,
     );
 
     const closeRequest = async () => {
