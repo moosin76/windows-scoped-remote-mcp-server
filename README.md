@@ -1,1 +1,382 @@
-# 🛡️ Windows Scoped Remote MCP Server\n\nWindows 환경에서 동작하는 **보안 격리형 원격 개발 MCP(Model Context Protocol) 서버**입니다.\nChatGPT, Claude 등 최신 LLM 클라이언트와 연동하여, 대화만으로 지정된 로컬 작업 공간 내에서 **파일 생성/수정, PowerShell 명령어 실행, 프로젝트 빌드 및 디버깅**을 자율 수행할 수 있습니다.\n\n---\n\n## 📌 주요 특징\n\n- **Windows 최적화 샌드박스 (`SandboxGuard`)**:\n  - 지정한 `MCP_WORKSPACE_ROOT` 디렉토리 외부의 파일/폴더 접근 및 명령어 실행을 100% 원천 차단합니다.\n- **ChatGPT 표준 OAuth 2.1 연동 (RFC 8414 / RFC 9728 / DCR / PKCE)**:\n  - 동적 클라이언트 등록(DCR) 및 대화형 보안 승인 페이지(`/authorize`)를 제공하여, 비밀번호 토큰(`MCP_AUTH_TOKEN`)을 아는 인가된 사용자만 안전하게 연결합니다.\n- **19종 풀스택 MCP 개발 도구 & OpenAPI 3.0 명세 탑재**:\n  - 파일 및 디렉토리 CRUD, 패치 적용(`apply_patch`), 비동기 프로세스 및 PowerShell/CMD 실행, 상태 모니터링을 완벽 지원합니다.\n- **Cloudflare Tunnel 기반 Zero Trust 통신**:\n  - 복잡한 포트포워딩이나 방화벽 개방 없이 Cloudflare Tunnel을 통해 안전한 HTTPS 엔드포인트를 제공합니다.\n- **프로젝트 무중단 전환 지원**:\n  - `.env`에서 `MCP_WORKSPACE_ROOT`만 변경하면 기존 ChatGPT 인증 세션을 유지한 채로 작업 폴더를 즉시 전환할 수 있습니다.\n\n---\n\n## 🏗️ 시스템 아키텍처\n\n```\n┌────────────────────────────────────────────────────────┐\n│                   ChatGPT (Web / App)                  │\n└───────────────────────────┬────────────────────────────┘\n                            │ HTTPS (Streamable HTTP / OAuth 2.1)\n                            ▼\n┌────────────────────────────────────────────────────────┐\n│        Cloudflare Zero Trust Tunnel (mcp.yourdomain)   │\n└───────────────────────────┬────────────────────────────┘\n                            │ Local Proxy (HTTP localhost:<MCP_PORT>)\n                            ▼\n┌────────────────────────────────────────────────────────┐\n│            Windows Scoped Remote MCP Server            │\n│  ┌──────────────────────────────────────────────────┐  │\n│  │ Express Router (/mcp, /authorize, /openapi.json) │  │\n│  └────────────────────────┬─────────────────────────┘  │\n│                           │                            │\n│  ┌────────────────────────▼─────────────────────────┐  │\n│  │   SandboxGuard & ProcessManager & FileService    │  │\n│  └────────────────────────┬─────────────────────────┘  │\n└───────────────────────────┼────────────────────────────┘\n                            │ 격리된 파일 & 명령어 실행\n                            ▼\n┌────────────────────────────────────────────────────────┐\n│       내 로컬 작업 공간 (MCP_WORKSPACE_ROOT)            │\n│      예: D:\Godot\mcp-test 또는 D:\Godot\MyGame         │\n└────────────────────────────────────────────────────────┘\n```\n\n---\n\n## 🛠️ 제공 도구 목록 (총 30 Tools)\n\n### 🌐 1. 브라우저 자동화 & 웹 테스트 도구 (Playwright 8 Tools)\n| 도구명 (Tool) | 설명 |\n| :--- | :--- |\n| **`browser_navigate`** | 웹사이트 주소(URL)로 브라우저 이동 및 페이지 로드 |\n| **`browser_screenshot`** | 현재 웹 화면 스크린샷 캡처 및 작업 폴더에 이미지 파일(PNG) 저장 |\n| **`browser_click`** | 버튼, 링크 등 특정 HTML 요소를 마우스 클릭 |\n| **`browser_fill`** | 검색창, 입력 폼에 텍스트 자동 타이핑 및 입력 |\n| **`browser_get_content`** | 웹페이지 본문 텍스트 또는 HTML 소스 추출 |\n| **`browser_evaluate`** | 브라우저 콘솔에서 자바스크립트(JS) 코드 실행 및 결과 수집 |\n| **`browser_press_key`** | 키보드 키(Enter, Tab, Escape, 화살표 등) 입력 |\n| **`browser_close`** | 브라우저 세션 종료 및 메모리 해제 |\n\n### 📂 2. 다중 워크스페이스 관리 도구 (3 Tools)\n| 도구명 (Tool) | 설명 |\n| :--- | :--- |\n| **`list_workspaces`** | 등록된 모든 다중 워크스페이스 목록, 별칭(Alias), 활성화 상태 조회 |\n| **`get_active_workspace`** | 현재 활성화된 기본 작업 공간의 이름과 절대 경로 조회 |\n| **`switch_workspace`** | 별칭(Alias) 또는 경로로 활성 작업 공간을 실시간 전환 |\n\n### 📁 3. 파일 및 코드 조작 도구 (11 Tools)\n| 도구명 (Tool) | 설명 |\n| :--- | :--- |\n| **`list_directory`** | 지정한 경로의 파일 및 하위 디렉토리 목록 조회 |\n| **`read_file`** | 텍스트 파일 읽기 (오프셋 및 분할 읽기 지원) |\n| **`write_file`** | 신규 파일 생성 및 덮어쓰기/이어쓰기 |\n| **`edit_file`** | 특정 줄 번호 및 블록 단위의 정확한 코드 수정 |\n| **`replace_in_file`** | 문자열 검색 및 대상 텍스트 일괄/단일 교체 |\n| **`apply_patch`** | 표준 Unified Diff / Patch 형식으로 파일에 패치 적용 |\n| **`make_directory`** | 신규 디렉토리 생성 |\n| **`delete_file`** | 파일 및 빈 디렉토리 삭제 |\n| **`move_file`** | 파일/폴더 이동 및 이름 변경 |\n| **`copy_file`** | 파일/폴더 복사 |\n| **`stat_path`** | 파일/폴더의 크기, 수정일, 속성 메타데이터 조회 |\n\n### ⚡ 4. 터미널 명령어 및 스크립트 실행 도구 (8 Tools)\n| 도구명 (Tool) | 설명 |\n| :--- | :--- |\n| **`search_files`** | Glob 패턴으로 파일명 검색 |\n| **`find_in_files`** | 파일 내부 텍스트 및 정규식 고속 검색 |\n| **`exec_command`** | PowerShell 또는 CMD 명령어를 실행하고 결과 반환 |\n| **`run_script`** | PowerShell, Batch, Node.js, Python 스크립트 실행 |\n| **`read_process_output`** | 장기 실행 중인 백그라운드 프로세스의 출력 버퍼 읽기 |\n| **`write_process_input`** | 실행 중인 프로세스의 표준 입력(stdin)으로 데이터 전송 |\n| **`stop_process`** | 백그라운드 프로세스 종료 |\n| **`list_processes`** | 현재 실행 중인 프로세스 목록 및 상태 조회 |\n\n---\n\n## ⚙️ 1. 환경 설정 가이드 (`.env`)\n\n프로젝트 루트의 `.env.example` 파일을 복사하여 `.env` 파일을 생성한 후 설정합니다:\n\n```cmd\ncopy .env.example .env\n```\n\n### 📋 주요 설정 항목 상세 설명\n\n| 환경 변수 | 기본값 / 예시 | 필수 여부 | 설명 |\n| :--- | :--- | :---: | :--- |\n| **`MCP_PORT`** | `12000` | 선택 | 로컬에서 Express 서버가 실행될 포트 번호 (기본값: `12000`) |\n| **`MCP_WORKSPACE_ROOTS`** | `test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle` | **필수** | **ChatGPT가 조작할 수 있는 다중 작업 공간 (별칭:경로)** |\n| **`MCP_AUTH_TOKEN`** | `your_secure_password` | **필수** | **ChatGPT OAuth 승인 페이지(`/authorize`)에서 입력할 보안 비밀번호** |\n| **`MCP_PUBLIC_URL`** | `https://mcp.yourdomain.com` | **필수** | Cloudflare Tunnel을 통해 외부에 노출되는 공개 HTTPS 주소 |\n| **`CLOUDFLARE_TUNNEL_TOKEN`** | `your_tunnel_token` | 선택 | Cloudflare Zero Trust 대시보드에서 발급받은 고정 터널 토큰 |\n| **`MCP_DEFAULT_SHELL`** | `powershell` | 선택 | `exec_command` 실행 시 기본 쉘 (`powershell`, `cmd`, `pwsh`) |\n| **`MCP_BROWSER_HEADLESS`** | `false` | 선택 | `false` 설정 시 **내 모니터에 실제 브라우저 창을 띄움**, `true`는 백그라운드 숨김 |\n| **`MCP_MAX_FILE_CHUNK_BYTES`** | `1048576` (1MB) | 선택 | `read_file` 1회 최대 읽기 바이트 크기 |\n| **`MCP_MAX_EDIT_FILE_BYTES`** | `67108864` (64MB) | 선택 | `edit_file` / `write_file` 최대 수정 가능 파일 크기 |\n| **`MCP_MAX_OUTPUT_BYTES`** | `1048576` (1MB) | 선택 | 터미널 명령어 실행 출력 버퍼 최대 크기 |\n\n```dotenv\n# [Server Port]\nMCP_PORT=12000\n\n# [Multi-Root Security & Directory Sandbox]\nMCP_WORKSPACE_ROOTS=test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle, server:C:\path\to\localRemoteMcp\n\n# [Authentication - ChatGPT OAuth 2.1]\nMCP_AUTH_TOKEN=your_secure_password_here\n\n# [Public Domain & Cloudflare Tunnel]\nMCP_PUBLIC_URL=https://mcp.yourdomain.com\nCLOUDFLARE_TUNNEL_TOKEN=your_cloudflare_tunnel_token_here\n\n# [Shell & Browser Configuration]\nMCP_DEFAULT_SHELL=powershell\nMCP_BROWSER_HEADLESS=false\n\n# [Limits - Safety Guardrails]\nMCP_MAX_FILE_CHUNK_BYTES=1048576\nMCP_MAX_EDIT_FILE_BYTES=67108864\nMCP_MAX_OUTPUT_BYTES=1048576\n```\n\n---\n\n## 🌐 2. Cloudflare Tunnel 및 도메인 연동\n\n본 서버는 Cloudflare Zero Trust 터널을 통해 `.env`에 지정된 로컬 포트(`MCP_PORT`, 기본값: `12000`)를 보유하신 도메인의 서브도메인(`https://mcp.yourdomain.com`)으로 안전하게 노출합니다.\n\n### 🔌 Cloudflare 대시보드 설정\n1. [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) ➔ **Networks** ➔ **Tunnels** 메뉴로 이동합니다.\n2. **[Create a tunnel]**을 클릭하여 Cloudflared 터널을 생성합니다.\n3. **Public Hostname** 추가:\n   - **Subdomain**: `mcp` (또는 원하는 서브도메인)\n   - **Domain**: `yourdomain.com` (보유하신 도메인 선택)\n   - **Service Type**: `HTTP`\n   - **URL**: `localhost:<MCP_PORT>` (예: `localhost:12000`)\n4. 발급된 **터널 토큰(Token)**을 복사하여 `.env`의 `CLOUDFLARE_TUNNEL_TOKEN` 항목에 붙여넣습니다.\n\n---\n\n## 📦 3. Cloudflare 바이너리 (`bin/cloudflared.exe`) 안내\n\n본 프로젝트는 터널을 자동으로 시작하기 위해 `cloudflared.exe` 바이너리를 사용합니다.\n\n- **자동 다운로드 지원 (권장)**:\n  - `start.bat` 또는 `start.ps1`을 최초 실행할 때 `bin/cloudflared.exe`가 없으면 **공식 Cloudflare GitHub Release에서 최신 바이너리를 자동으로 다운로드**하여 배치합니다.\n  - 사용자가 별도로 다운로드할 필요 없이 `start.bat`만 실행하면 됩니다.\n- **수동 다운로드 (오프라인 / 방화벽 환경)**:\n  - 자동 다운로드가 제한된 환경인 경우, [Cloudflare 공식 릴리즈 페이지](https://github.com/cloudflare/cloudflared/releases)에서 `cloudflared-windows-amd64.exe` 파일을 다운로드한 뒤, 프로젝트 내 `bin/cloudflared.exe` 경로로 이름을 바꾸어 넣어주시면 됩니다.\n\n---\n\n## 🚀 4. 서버 실행 방법\n\n### 방법 A. 원클릭 자동 실행 (`start.bat` / 권장)\n`start.bat`을 더블 클릭하거나 콘솔에서 실행합니다:\n```cmd\nstart.bat\n```\n*(자동으로 npm 패키지 설치 ➔ .env 확인 ➔ cloudflared 바이너리 확인 ➔ TypeScript 빌드 및 서버 + 터널을 한 번에 실행합니다)*\n\n### 방법 B. 수동 터미널 실행\n```bash\n# 1. 의존성 설치\nnpm install\n\n# 2. TypeScript 컴파일\nnpm run build\n\n# 3. 테스트 실행\nnpm test\n\n# 4. 서버 시작\nnpm start\n```\n\n---\n\n## 🤖 5. ChatGPT 앱 / 플러그인 연결 가이드 (단계별)\n\n### 1단계. ChatGPT 앱 등록\n1. [ChatGPT 웹](https://chatgpt.com/)에 접속하여 **[설정] ➔ [플러그인 / 개발자 모드]**로 이동합니다.\n2. **[+ 새 플러그인 / 앱 만들기]**를 클릭합니다.\n3. 설정값을 다음과 같이 입력합니다:\n   - **이름**: `my-remote` (또는 원하는 이름)\n   - **연결 (Connection)**: `서버 URL` ➔ **`https://mcp.yourdomain.com/mcp`** (본인 도메인)\n   - **인증 (Authentication)**: **`OAuth`** 선택\n4. **[만들기]**를 클릭합니다.\n\n### 2단계. 보안 로그인 승인\n1. 등록된 앱 상세 화면에서 **`[연결 ➔]`** 버튼을 누릅니다.\n2. 브라우저 팝업으로 **[Windows Scoped Remote MCP 승인]** 웹 페이지가 나타납니다.\n3. 비밀번호 입력란에 `.env`에 설정된 **`MCP_AUTH_TOKEN`** 값을 입력하고 **[승인하고 ChatGPT로 돌아가기]**를 클릭합니다.\n\n### 3단계. 권한 설정 ("모든 액션 허용")\n- 앱 상세 화면의 **권한 (Permissions)** 옵션을 **`모든 액션 허용`**으로 설정합니다.\n- *(도구를 호출할 때마다 매번 확인 팝업이 뜨지 않고 ChatGPT가 자율적으로 개발을 진행합니다)*\n\n---\n\n## 💬 6. 실전 대화형 개발 프롬프트 예시\n\n새 채팅창(또는 `@ 플러그인` 채팅창)에서 다음과 같이 지시할 수 있습니다:\n\n```text\n# 1. 프로젝트 파일 목록 및 구조 파악\n@my-remote 현재 작업 공간의 파일과 폴더 목록을 정리해서 보여줘\n\n# 2. 웹 게임 / 프론트엔드 프로젝트 개발\n@my-remote HTML5 Canvas로 브라우저에서 실행 가능한 레트로풍 벽돌깨기 게임(breakout.html)을 세련되게 만들어줘\n\n# 3. Godot 4 게임 스크립트 작성\n@my-remote Godot 4 기준으로 2D 캐릭터 이동, 대시, 점프 및 물리 충돌을 처리하는 Player.gd를 작성해줘\n\n# 4. 패키지 설치 및 테스트 실행\n@my-remote npm install 명령어로 필요한 라이브러리를 설치하고 npm test를 돌려 결과를 확인해줘\n\n# 5. 웹 브라우저 자동화 & 화면 캡처 (Playwright)\n@my-remote 네이버(naver.com)로 이동해서 검색창에 'Godot Engine 4' 검색하고 결과 페이지 스크린샷 찍어서 search.png로 저장해줘\n\n# 6. 내가 만든 로컬 웹페이지 실시간 검증\n@my-remote 로컬 웹서버를 실행하고 브라우저로 접속해서 [게임 시작] 버튼을 누른 다음 화면이 잘 나오는지 스크린샷으로 확인해줘\n```\n\n---\n\n## 📂 7. 다중 프로젝트 관리 및 실시간 전환 방법\n\n본 서버는 **다중 워크스페이스(Multi-Workspace)**를 지원하므로, 여러 프로젝트를 동시에 등록하고 대화 도중 실시간으로 전환할 수 있습니다.\n\n### 방법 A. ChatGPT 대화로 실시간 전환 (서버 재부팅 없음 ⭐)\n1. **현재 작업 공간 확인**:\n   ```text\n   @my-remote 현재 작업 공간이 어디로 설정되어 있는지 확인해줘\n   ```\n2. **등록된 전체 프로젝트 목록 확인**:\n   ```text\n   @my-remote 등록된 모든 워크스페이스 목록을 보여줘\n   ```\n3. **작업 공간 즉시 전환**:\n   ```text\n   @my-remote ether 프로젝트로 작업 공간을 전환해줘\n   ```\n   *(ChatGPT가 `switch_workspace(name: "ether")` 도구를 호출하여 서버 재부팅 없이 즉시 해당 프로젝트로 전환합니다)*\n\n### 방법 B. 새 프로젝트 추가 등록 (`.env`)\n1. `.env` 파일의 `MCP_WORKSPACE_ROOTS`에 새로운 프로젝트 별칭과 경로를 추가합니다:\n   ```dotenv\n   MCP_WORKSPACE_ROOTS=test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle, mygame:C:\path\to\mygame\n   ```\n2. 터미널에서 `start.bat`을 재실행하면 추가된 프로젝트들도 즉시 접근 및 전환이 가능해집니다. (OAuth 인증 토큰 세션은 영구 보존됩니다)\n\n---\n\n## 🔒 8. 보안 및 문제 해결\n\n- **Q. 외부인이 내 컴퓨터에 무단 접속할 위험은 없나요?**\n  - **3중 보안 구조**로 완벽하게 보호됩니다:\n    1. **비밀번호 인증**: `MCP_AUTH_TOKEN` 비밀번호를 아는 본인의 ChatGPT 계정만 접근 가능.\n    2. **샌드박스 격리**: 파일 및 명령어가 오직 지정된 `MCP_WORKSPACE_ROOT` 내에서만 작동하며 상위 경로 접근 시 즉시 차단.\n    3. **Cloudflare Zero Trust**: Cloudflare 대시보드에서 내 IP만 허용하는 방화벽 규칙을 추가할 수 있습니다.\n- **Q. 터널이 연결되지 않거나 502 에러가 날 때**:\n  - `start.bat` 창에서 로컬 서버(`port: .env의 MCP_PORT`)가 정상적으로 켜져 있는지 확인하고, 브라우저에서 `https://mcp.yourdomain.com/health`로 접속하여 `{ status: "ok" }` 응답이 나오는지 확인합니다.\n\n---\n\n## 📄 라이선스\nMIT License\n\n---\n\n## MCP 확장하기: 원하는 MCP를 추가해서 사용하기\n\n이 프로젝트는 모든 사용자가 같은 MCP를 사용할 필요가 없도록 **Remote MCP Provider 구조**를 사용합니다.\n\nGodot, Blender, 디자인 도구, 데이터베이스 등 사용하려는 MCP가 다르더라도 기존 Gateway를 다시 만들 필요 없이 원하는 MCP를 Provider로 추가할 수 있습니다.\n\n### 가장 쉬운 방법: ChatGPT에게 추가를 요청하세요\n\n이 프로젝트를 처음 받았다면 직접 코드를 수정하기 전에 ChatGPT에게 다음처럼 요청할 수 있습니다.\n\n```text\n이 windows-scoped-remote-mcp-server 프로젝트에 Blender MCP를 추가해줘.\n현재 프로젝트의 AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고\n기존 Provider/Gateway 구조를 따라 추가해줘.\nBlender MCP의 연결 방법과 필요한 설정을 확인한 다음,\nblender_* namespace를 사용하고 테스트와 문서까지 추가해줘.\n기존 Workspace와 Playwright 기능은 변경하지 말고,\ntypecheck와 전체 테스트를 통과한 뒤 Git checkpoint까지 만들어줘.\n```\n\n다른 MCP도 같은 방식으로 요청할 수 있습니다.\n\n```text\n이 프로젝트에 <원하는 MCP>를 추가해줘.\nAGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고\n기존 RemoteMcpProvider 구조를 재사용해줘.\n```\n\n### MCP 추가 시 지켜야 하는 구조\n\n새로운 MCP는 가능한 한 다음 구조를 따릅니다.\n\n```text\n                    Windows Scoped Remote MCP\n                              │\n                       ProviderRegistry\n                              │\n             ┌────────────────┼────────────────┐\n             │                │                │\n          Godot           Blender          Future MCP\n             │                │                │\n        godot_*          blender_*         <name>_*\n             │                │                │\n          Godot MCP       Blender MCP       Remote MCP\n```\n\n각 MCP는 고유한 **namespace**를 사용합니다.\n\n| MCP | Namespace 예시 |\n| :--- | :--- |\n| Godot | `godot_*` |\n| Blender | `blender_*` |\n| Playwright | `browser_*` |\n| 새로운 MCP | `<provider>_*` |\n\n예를 들어 Blender MCP가 `get_scene`이라는 tool을 제공하더라도 ChatGPT에는 `blender_get_scene`으로 노출합니다. Gateway가 호출할 때 다시 원래 MCP의 `get_scene`으로 전달합니다.\n\n### MCP를 직접 추가해야 한다면\n\n1. `AGENT.md`를 먼저 읽습니다.\n2. `skills/add-remote-mcp-provider/SKILL.md`를 읽습니다.\n3. MCP의 공식 연결 방식과 endpoint를 확인합니다.\n4. `RemoteMcpProvider`를 재사용합니다.\n5. 고유 namespace를 지정합니다.\n6. JSON Schema와 tool 목록을 검증합니다.\n7. Provider 단위 테스트를 추가합니다.\n8. `npm run typecheck`와 `npm test`를 실행합니다.\n9. WSR을 재시작합니다.\n10. ChatGPT에서 MCP 도구 목록을 새로 고침합니다.\n11. 읽기 전용 tool부터 실제 호출을 테스트합니다.\n12. 정상 확인 후 Git checkpoint를 생성합니다.\n\n### 중요한 원칙\n\n- MCP마다 별도의 구현을 Gateway에 복제하지 않습니다.\n- 가능하면 `RemoteMcpProvider` 하나를 재사용합니다.\n- MCP tool 이름 충돌을 막기 위해 namespace를 반드시 사용합니다.\n- 원격 MCP의 JSON Schema를 임의로 단순화하지 않습니다.\n- 새로운 MCP를 추가해도 기존 Workspace, Playwright, 다른 Provider가 영향을 받지 않도록 합니다.\n- MCP 연결 정보, 토큰, 비밀번호 등의 민감한 값은 Git에 커밋하지 않습니다.\n\n자세한 구조와 문제 해결 방법은 다음 문서를 참고하세요.\n\n- `AGENT.md` — 이 프로젝트의 작업 규칙\n- `docs/mcp-gateway-architecture.md` — Gateway/Provider 구조\n- `skills/add-remote-mcp-provider/SKILL.md` — 새로운 MCP 추가 절차\n- `skills/test-mcp-provider/SKILL.md` — Provider 테스트 방법\n- `skills/debug-mcp-gateway/SKILL.md` — MCP 연결 및 도구 오류 진단\n
+# 🛡️ Windows Scoped Remote MCP Server
+
+Windows 환경에서 동작하는 **보안 격리형 원격 개발 MCP(Model Context Protocol) 서버**입니다.  
+ChatGPT, Claude 등 최신 LLM 클라이언트와 연동하여, 대화만으로 지정된 로컬 작업 공간 내에서 **파일 생성/수정, PowerShell 명령어 실행, 프로젝트 빌드 및 디버깅**을 자율 수행할 수 있습니다.
+
+---
+
+## 📌 주요 특징
+
+- **Windows 최적화 샌드박스 (`SandboxGuard`)**:
+  - 지정한 `MCP_WORKSPACE_ROOT` 디렉토리 외부의 파일/폴더 접근 및 명령어 실행을 100% 원천 차단합니다.
+- **ChatGPT 표준 OAuth 2.1 연동 (RFC 8414 / RFC 9728 / DCR / PKCE)**:
+  - 동적 클라이언트 등록(DCR) 및 대화형 보안 승인 페이지(`/authorize`)를 제공하여, 비밀번호 토큰(`MCP_AUTH_TOKEN`)을 아는 인가된 사용자만 안전하게 연결합니다.
+- **19종 풀스택 MCP 개발 도구 & OpenAPI 3.0 명세 탑재**:
+  - 파일 및 디렉토리 CRUD, 패치 적용(`apply_patch`), 비동기 프로세스 및 PowerShell/CMD 실행, 상태 모니터링을 완벽 지원합니다.
+- **Cloudflare Tunnel 기반 Zero Trust 통신**:
+  - 복잡한 포트포워딩이나 방화벽 개방 없이 Cloudflare Tunnel을 통해 안전한 HTTPS 엔드포인트를 제공합니다.
+- **프로젝트 무중단 전환 지원**:
+  - `.env`에서 `MCP_WORKSPACE_ROOT`만 변경하면 기존 ChatGPT 인증 세션을 유지한 채로 작업 폴더를 즉시 전환할 수 있습니다.
+
+---
+
+## 🏗️ 시스템 아키텍처
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   ChatGPT (Web / App)                  │
+└───────────────────────────┬────────────────────────────┘
+                            │ HTTPS (Streamable HTTP / OAuth 2.1)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│        Cloudflare Zero Trust Tunnel (mcp.yourdomain)   │
+└───────────────────────────┬────────────────────────────┘
+                            │ Local Proxy (HTTP localhost:<MCP_PORT>)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│            Windows Scoped Remote MCP Server            │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ Express Router (/mcp, /authorize, /openapi.json) │  │
+│  └────────────────────────┬─────────────────────────┘  │
+│                           │                            │
+│  ┌────────────────────────▼─────────────────────────┐  │
+│  │   SandboxGuard & ProcessManager & FileService    │  │
+│  └────────────────────────┬─────────────────────────┘  │
+└───────────────────────────┼────────────────────────────┘
+                            │ 격리된 파일 & 명령어 실행
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│       내 로컬 작업 공간 (MCP_WORKSPACE_ROOT)            │
+│      예: D:\Godot\mcp-test 또는 D:\Godot\MyGame         │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🛠️ 제공 도구 목록 (총 30 Tools)
+
+### 🌐 1. 브라우저 자동화 & 웹 테스트 도구 (Playwright 8 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
+| **`browser_navigate`** | 웹사이트 주소(URL)로 브라우저 이동 및 페이지 로드 |
+| **`browser_screenshot`** | 현재 웹 화면 스크린샷 캡처 및 작업 폴더에 이미지 파일(PNG) 저장 |
+| **`browser_click`** | 버튼, 링크 등 특정 HTML 요소를 마우스 클릭 |
+| **`browser_fill`** | 검색창, 입력 폼에 텍스트 자동 타이핑 및 입력 |
+| **`browser_get_content`** | 웹페이지 본문 텍스트 또는 HTML 소스 추출 |
+| **`browser_evaluate`** | 브라우저 콘솔에서 자바스크립트(JS) 코드 실행 및 결과 수집 |
+| **`browser_press_key`** | 키보드 키(Enter, Tab, Escape, 화살표 등) 입력 |
+| **`browser_close`** | 브라우저 세션 종료 및 메모리 해제 |
+
+### 📂 2. 다중 워크스페이스 관리 도구 (3 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
+| **`list_workspaces`** | 등록된 모든 다중 워크스페이스 목록, 별칭(Alias), 활성화 상태 조회 |
+| **`get_active_workspace`** | 현재 활성화된 기본 작업 공간의 이름과 절대 경로 조회 |
+| **`switch_workspace`** | 별칭(Alias) 또는 경로로 활성 작업 공간을 실시간 전환 |
+
+### 📁 3. 파일 및 코드 조작 도구 (11 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
+| **`list_directory`** | 지정한 경로의 파일 및 하위 디렉토리 목록 조회 |
+| **`read_file`** | 텍스트 파일 읽기 (오프셋 및 분할 읽기 지원) |
+| **`write_file`** | 신규 파일 생성 및 덮어쓰기/이어쓰기 |
+| **`edit_file`** | 특정 줄 번호 및 블록 단위의 정확한 코드 수정 |
+| **`replace_in_file`** | 문자열 검색 및 대상 텍스트 일괄/단일 교체 |
+| **`apply_patch`** | 표준 Unified Diff / Patch 형식으로 파일에 패치 적용 |
+| **`make_directory`** | 신규 디렉토리 생성 |
+| **`delete_file`** | 파일 및 빈 디렉토리 삭제 |
+| **`move_file`** | 파일/폴더 이동 및 이름 변경 |
+| **`copy_file`** | 파일/폴더 복사 |
+| **`stat_path`** | 파일/폴더의 크기, 수정일, 속성 메타데이터 조회 |
+
+### ⚡ 4. 터미널 명령어 및 스크립트 실행 도구 (8 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
+| **`search_files`** | Glob 패턴으로 파일명 검색 |
+| **`find_in_files`** | 파일 내부 텍스트 및 정규식 고속 검색 |
+| **`exec_command`** | PowerShell 또는 CMD 명령어를 실행하고 결과 반환 |
+| **`run_script`** | PowerShell, Batch, Node.js, Python 스크립트 실행 |
+| **`read_process_output`** | 장기 실행 중인 백그라운드 프로세스의 출력 버퍼 읽기 |
+| **`write_process_input`** | 실행 중인 프로세스의 표준 입력(stdin)으로 데이터 전송 |
+| **`stop_process`** | 백그라운드 프로세스 종료 |
+| **`list_processes`** | 현재 실행 중인 프로세스 목록 및 상태 조회 |
+
+---
+
+## ⚙️ 1. 환경 설정 가이드 (`.env`)
+
+프로젝트 루트의 `.env.example` 파일을 복사하여 `.env` 파일을 생성한 후 설정합니다:
+
+```cmd
+copy .env.example .env
+```
+
+### 📋 주요 설정 항목 상세 설명
+
+| 환경 변수 | 기본값 / 예시 | 필수 여부 | 설명 |
+| :--- | :--- | :---: | :--- |
+| **`MCP_PORT`** | `12000` | 선택 | 로컬에서 Express 서버가 실행될 포트 번호 (기본값: `12000`) |
+| **`MCP_WORKSPACE_ROOTS`** | `test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle` | **필수** | **ChatGPT가 조작할 수 있는 다중 작업 공간 (별칭:경로)** |
+| **`MCP_AUTH_TOKEN`** | `your_secure_password` | **필수** | **ChatGPT OAuth 승인 페이지(`/authorize`)에서 입력할 보안 비밀번호** |
+| **`MCP_PUBLIC_URL`** | `https://mcp.yourdomain.com` | **필수** | Cloudflare Tunnel을 통해 외부에 노출되는 공개 HTTPS 주소 |
+| **`CLOUDFLARE_TUNNEL_TOKEN`** | `your_tunnel_token` | 선택 | Cloudflare Zero Trust 대시보드에서 발급받은 고정 터널 토큰 |
+| **`MCP_DEFAULT_SHELL`** | `powershell` | 선택 | `exec_command` 실행 시 기본 쉘 (`powershell`, `cmd`, `pwsh`) |
+| **`MCP_BROWSER_HEADLESS`** | `false` | 선택 | `false` 설정 시 **내 모니터에 실제 브라우저 창을 띄움**, `true`는 백그라운드 숨김 |
+| **`MCP_MAX_FILE_CHUNK_BYTES`** | `1048576` (1MB) | 선택 | `read_file` 1회 최대 읽기 바이트 크기 |
+| **`MCP_MAX_EDIT_FILE_BYTES`** | `67108864` (64MB) | 선택 | `edit_file` / `write_file` 최대 수정 가능 파일 크기 |
+| **`MCP_MAX_OUTPUT_BYTES`** | `1048576` (1MB) | 선택 | 터미널 명령어 실행 출력 버퍼 최대 크기 |
+
+```dotenv
+# [Server Port]
+MCP_PORT=12000
+
+# [Multi-Root Security & Directory Sandbox]
+MCP_WORKSPACE_ROOTS=test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle, server:C:\path\to\localRemoteMcp
+
+# [Authentication - ChatGPT OAuth 2.1]
+MCP_AUTH_TOKEN=your_secure_password_here
+
+# [Public Domain & Cloudflare Tunnel]
+MCP_PUBLIC_URL=https://mcp.yourdomain.com
+CLOUDFLARE_TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
+
+# [Shell & Browser Configuration]
+MCP_DEFAULT_SHELL=powershell
+MCP_BROWSER_HEADLESS=false
+
+# [Limits - Safety Guardrails]
+MCP_MAX_FILE_CHUNK_BYTES=1048576
+MCP_MAX_EDIT_FILE_BYTES=67108864
+MCP_MAX_OUTPUT_BYTES=1048576
+```
+
+---
+
+## 🌐 2. Cloudflare Tunnel 및 도메인 연동
+
+본 서버는 Cloudflare Zero Trust 터널을 통해 `.env`에 지정된 로컬 포트(`MCP_PORT`, 기본값: `12000`)를 보유하신 도메인의 서브도메인(`https://mcp.yourdomain.com`)으로 안전하게 노출합니다.
+
+### 🔌 Cloudflare 대시보드 설정
+1. [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) ➔ **Networks** ➔ **Tunnels** 메뉴로 이동합니다.
+2. **[Create a tunnel]**을 클릭하여 Cloudflared 터널을 생성합니다.
+3. **Public Hostname** 추가:
+   - **Subdomain**: `mcp` (또는 원하는 서브도메인)
+   - **Domain**: `yourdomain.com` (보유하신 도메인 선택)
+   - **Service Type**: `HTTP`
+   - **URL**: `localhost:<MCP_PORT>` (예: `localhost:12000`)
+4. 발급된 **터널 토큰(Token)**을 복사하여 `.env`의 `CLOUDFLARE_TUNNEL_TOKEN` 항목에 붙여넣습니다.
+
+---
+
+## 📦 3. Cloudflare 바이너리 (`bin/cloudflared.exe`) 안내
+
+본 프로젝트는 터널을 자동으로 시작하기 위해 `cloudflared.exe` 바이너리를 사용합니다.
+
+- **자동 다운로드 지원 (권장)**:
+  - `start.bat` 또는 `start.ps1`을 최초 실행할 때 `bin/cloudflared.exe`가 없으면 **공식 Cloudflare GitHub Release에서 최신 바이너리를 자동으로 다운로드**하여 배치합니다.
+  - 사용자가 별도로 다운로드할 필요 없이 `start.bat`만 실행하면 됩니다.
+- **수동 다운로드 (오프라인 / 방화벽 환경)**:
+  - 자동 다운로드가 제한된 환경인 경우, [Cloudflare 공식 릴리즈 페이지](https://github.com/cloudflare/cloudflared/releases)에서 `cloudflared-windows-amd64.exe` 파일을 다운로드한 뒤, 프로젝트 내 `bin/cloudflared.exe` 경로로 이름을 바꾸어 넣어주시면 됩니다.
+
+---
+
+## 🚀 4. 서버 실행 방법
+
+### 방법 A. 원클릭 자동 실행 (`start.bat` / 권장)
+`start.bat`을 더블 클릭하거나 콘솔에서 실행합니다:
+```cmd
+start.bat
+```
+*(자동으로 npm 패키지 설치 ➔ .env 확인 ➔ cloudflared 바이너리 확인 ➔ TypeScript 빌드 및 서버 + 터널을 한 번에 실행합니다)*
+
+### 방법 B. 수동 터미널 실행
+```bash
+# 1. 의존성 설치
+npm install
+
+# 2. TypeScript 컴파일
+npm run build
+
+# 3. 테스트 실행
+npm test
+
+# 4. 서버 시작
+npm start
+```
+
+---
+
+## 🤖 5. ChatGPT 앱 / 플러그인 연결 가이드 (단계별)
+
+### 1단계. ChatGPT 앱 등록
+1. [ChatGPT 웹](https://chatgpt.com/)에 접속하여 **[설정] ➔ [플러그인 / 개발자 모드]**로 이동합니다.
+2. **[+ 새 플러그인 / 앱 만들기]**를 클릭합니다.
+3. 설정값을 다음과 같이 입력합니다:
+   - **이름**: `my-remote` (또는 원하는 이름)
+   - **연결 (Connection)**: `서버 URL` ➔ **`https://mcp.yourdomain.com/mcp`** (본인 도메인)
+   - **인증 (Authentication)**: **`OAuth`** 선택
+4. **[만들기]**를 클릭합니다.
+
+### 2단계. 보안 로그인 승인
+1. 등록된 앱 상세 화면에서 **`[연결 ➔]`** 버튼을 누릅니다.
+2. 브라우저 팝업으로 **[Windows Scoped Remote MCP 승인]** 웹 페이지가 나타납니다.
+3. 비밀번호 입력란에 `.env`에 설정된 **`MCP_AUTH_TOKEN`** 값을 입력하고 **[승인하고 ChatGPT로 돌아가기]**를 클릭합니다.
+
+### 3단계. 권한 설정 ("모든 액션 허용")
+- 앱 상세 화면의 **권한 (Permissions)** 옵션을 **`모든 액션 허용`**으로 설정합니다.
+- *(도구를 호출할 때마다 매번 확인 팝업이 뜨지 않고 ChatGPT가 자율적으로 개발을 진행합니다)*
+
+---
+
+## 💬 6. 실전 대화형 개발 프롬프트 예시
+
+새 채팅창(또는 `@ 플러그인` 채팅창)에서 다음과 같이 지시할 수 있습니다:
+
+```text
+# 1. 프로젝트 파일 목록 및 구조 파악
+@my-remote 현재 작업 공간의 파일과 폴더 목록을 정리해서 보여줘
+
+# 2. 웹 게임 / 프론트엔드 프로젝트 개발
+@my-remote HTML5 Canvas로 브라우저에서 실행 가능한 레트로풍 벽돌깨기 게임(breakout.html)을 세련되게 만들어줘
+
+# 3. Godot 4 게임 스크립트 작성
+@my-remote Godot 4 기준으로 2D 캐릭터 이동, 대시, 점프 및 물리 충돌을 처리하는 Player.gd를 작성해줘
+
+# 4. 패키지 설치 및 테스트 실행
+@my-remote npm install 명령어로 필요한 라이브러리를 설치하고 npm test를 돌려 결과를 확인해줘
+
+# 5. 웹 브라우저 자동화 & 화면 캡처 (Playwright)
+@my-remote 네이버(naver.com)로 이동해서 검색창에 'Godot Engine 4' 검색하고 결과 페이지 스크린샷 찍어서 search.png로 저장해줘
+
+# 6. 내가 만든 로컬 웹페이지 실시간 검증
+@my-remote 로컬 웹서버를 실행하고 브라우저로 접속해서 [게임 시작] 버튼을 누른 다음 화면이 잘 나오는지 스크린샷으로 확인해줘
+```
+
+---
+
+## 📂 7. 다중 프로젝트 관리 및 실시간 전환 방법
+
+본 서버는 **다중 워크스페이스(Multi-Workspace)**를 지원하므로, 여러 프로젝트를 동시에 등록하고 대화 도중 실시간으로 전환할 수 있습니다.
+
+### 방법 A. ChatGPT 대화로 실시간 전환 (서버 재부팅 없음 ⭐)
+1. **현재 작업 공간 확인**:
+   ```text
+   @my-remote 현재 작업 공간이 어디로 설정되어 있는지 확인해줘
+   ```
+2. **등록된 전체 프로젝트 목록 확인**:
+   ```text
+   @my-remote 등록된 모든 워크스페이스 목록을 보여줘
+   ```
+3. **작업 공간 즉시 전환**:
+   ```text
+   @my-remote ether 프로젝트로 작업 공간을 전환해줘
+   ```
+   *(ChatGPT가 `switch_workspace(name: "ether")` 도구를 호출하여 서버 재부팅 없이 즉시 해당 프로젝트로 전환합니다)*
+
+### 방법 B. 새 프로젝트 추가 등록 (`.env`)
+1. `.env` 파일의 `MCP_WORKSPACE_ROOTS`에 새로운 프로젝트 별칭과 경로를 추가합니다:
+   ```dotenv
+   MCP_WORKSPACE_ROOTS=test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle, mygame:C:\path\to\mygame
+   ```
+2. 터미널에서 `start.bat`을 재실행하면 추가된 프로젝트들도 즉시 접근 및 전환이 가능해집니다. (OAuth 인증 토큰 세션은 영구 보존됩니다)
+
+---
+
+## 🔒 8. 보안 및 문제 해결
+
+- **Q. 외부인이 내 컴퓨터에 무단 접속할 위험은 없나요?**
+  - **3중 보안 구조**로 완벽하게 보호됩니다:
+    1. **비밀번호 인증**: `MCP_AUTH_TOKEN` 비밀번호를 아는 본인의 ChatGPT 계정만 접근 가능.
+    2. **샌드박스 격리**: 파일 및 명령어가 오직 지정된 `MCP_WORKSPACE_ROOT` 내에서만 작동하며 상위 경로 접근 시 즉시 차단.
+    3. **Cloudflare Zero Trust**: Cloudflare 대시보드에서 내 IP만 허용하는 방화벽 규칙을 추가할 수 있습니다.
+- **Q. 터널이 연결되지 않거나 502 에러가 날 때**:
+  - `start.bat` 창에서 로컬 서버(`port: .env의 MCP_PORT`)가 정상적으로 켜져 있는지 확인하고, 브라우저에서 `https://mcp.yourdomain.com/health`로 접속하여 `{ status: "ok" }` 응답이 나오는지 확인합니다.
+
+---
+
+## 📄 라이선스
+MIT License
+## MCP 확장하기: 원하는 MCP를 추가해서 사용하기
+
+이 프로젝트는 모든 사용자가 같은 MCP를 사용할 필요가 없도록 Remote MCP Provider 구조를 사용합니다.
+
+Godot, Blender, 디자인 도구, 데이터베이스 등 사용하려는 MCP가 다르더라도 기존 Gateway를 다시 만들 필요 없이 원하는 MCP를 Provider로 추가할 수 있습니다.
+
+### 가장 쉬운 방법: ChatGPT에게 추가를 요청하세요
+
+이 프로젝트를 처음 받았다면 직접 코드를 수정하기 전에 ChatGPT에게 다음처럼 요청할 수 있습니다.
+
+```text
+이 windows-scoped-remote-mcp-server 프로젝트에 Blender MCP를 추가해줘.
+현재 프로젝트의 AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
+기존 Provider/Gateway 구조를 따라 추가해줘.
+Blender MCP의 연결 방법과 필요한 설정을 확인한 다음,
+blender_* namespace를 사용하고 테스트와 문서까지 추가해줘.
+기존 Workspace와 Playwright 기능은 변경하지 말고,
+typecheck와 전체 테스트를 통과한 뒤 Git checkpoint까지 만들어줘.
+```
+
+다른 MCP도 같은 방식으로 요청할 수 있습니다.
+
+```text
+이 프로젝트에 <원하는 MCP>를 추가해줘.
+AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
+기존 RemoteMcpProvider 구조를 재사용해줘.
+```
+
+### MCP 추가 시 지켜야 하는 구조
+
+```text
+Windows Scoped Remote MCP
+        │
+ ProviderRegistry
+        │
+ ┌──────┼────────┐
+ │      │        │
+Godot Blender  Future MCP
+ │      │        │
+godot_* blender_* <provider>_*
+```
+
+각 MCP는 고유한 namespace를 사용합니다.
+
+| MCP | Namespace 예시 |
+| :--- | :--- |
+| Godot | `godot_*` |
+| Blender | `blender_*` |
+| Playwright | `browser_*` |
+| 새로운 MCP | `<provider>_*` |
+
+예를 들어 Blender MCP가 `get_scene`이라는 tool을 제공하더라도 ChatGPT에는 `blender_get_scene`으로 노출합니다. Gateway가 호출할 때 다시 원래 MCP의 `get_scene`으로 전달합니다.
+
+### MCP를 직접 추가해야 한다면
+
+1. `AGENT.md`를 먼저 읽습니다.
+2. `skills/add-remote-mcp-provider/SKILL.md`를 읽습니다.
+3. MCP의 공식 연결 방식과 endpoint를 확인합니다.
+4. `RemoteMcpProvider`를 재사용합니다.
+5. 고유 namespace를 지정합니다.
+6. JSON Schema와 tool 목록을 검증합니다.
+7. Provider 단위 테스트를 추가합니다.
+8. `npm run typecheck`와 `npm test`를 실행합니다.
+9. WSR을 재시작합니다.
+10. ChatGPT에서 MCP 도구 목록을 새로 고침합니다.
+11. 읽기 전용 tool부터 실제 호출을 테스트합니다.
+12. 정상 확인 후 Git checkpoint를 생성합니다.
+
+### 중요한 원칙
+
+- MCP마다 별도의 구현을 Gateway에 복제하지 않습니다.
+- 가능하면 `RemoteMcpProvider` 하나를 재사용합니다.
+- MCP tool 이름 충돌을 막기 위해 namespace를 반드시 사용합니다.
+- 원격 MCP의 JSON Schema를 임의로 단순화하지 않습니다.
+- 새로운 MCP를 추가해도 기존 Workspace, Playwright, 다른 Provider가 영향을 받지 않도록 합니다.
+- MCP 연결 정보, 토큰, 비밀번호 등의 민감한 값은 Git에 커밋하지 않습니다.
+
+자세한 내용은 다음 문서를 참고하세요.
+
+- `AGENT.md` — 이 프로젝트의 작업 규칙
+- `docs/mcp-gateway-architecture.md` — Gateway/Provider 구조
+- `skills/add-remote-mcp-provider/SKILL.md` — 새로운 MCP 추가 절차
+- `skills/test-mcp-provider/SKILL.md` — Provider 테스트 방법
+- `skills/debug-mcp-gateway/SKILL.md` — MCP 연결 및 도구 오류 진단
