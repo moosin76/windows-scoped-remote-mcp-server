@@ -1,383 +1,326 @@
-# 🛡️ Windows Scoped Remote MCP Server
+﻿# 🛡️ Windows Scoped Remote MCP Server
 
-Windows 환경에서 동작하는 **보안 격리형 원격 개발 MCP(Model Context Protocol) 서버**입니다.  
-ChatGPT, Claude 등 최신 LLM 클라이언트와 연동하여, 대화만으로 지정된 로컬 작업 공간 내에서 **파일 생성/수정, PowerShell 명령어 실행, 프로젝트 빌드 및 디버깅**을 자율 수행할 수 있습니다.
+Windows 환경에서 동작하는 **보안 격리형 원격 개발 MCP(Model Context Protocol) 서버**입니다.
 
----
+ChatGPT, Claude 등 MCP를 지원하는 LLM 클라이언트와 연결하여 실제 Windows 개발 환경의 파일, 터미널, 프로세스, 브라우저, 여러 Workspace를 대화형으로 다룰 수 있습니다.
 
-## 📌 주요 특징
-
-- **Windows 최적화 샌드박스 (`SandboxGuard`)**:
-  - 지정한 `MCP_WORKSPACE_ROOT` 디렉토리 외부의 파일/폴더 접근 및 명령어 실행을 100% 원천 차단합니다.
-- **ChatGPT 표준 OAuth 2.1 연동 (RFC 8414 / RFC 9728 / DCR / PKCE)**:
-  - 동적 클라이언트 등록(DCR) 및 대화형 보안 승인 페이지(`/authorize`)를 제공하여, 비밀번호 토큰(`MCP_AUTH_TOKEN`)을 아는 인가된 사용자만 안전하게 연결합니다.
-- **19종 풀스택 MCP 개발 도구 & OpenAPI 3.0 명세 탑재**:
-  - 파일 및 디렉토리 CRUD, 패치 적용(`apply_patch`), 비동기 프로세스 및 PowerShell/CMD 실행, 상태 모니터링을 완벽 지원합니다.
-- **Cloudflare Tunnel 기반 Zero Trust 통신**:
-  - 복잡한 포트포워딩이나 방화벽 개방 없이 Cloudflare Tunnel을 통해 안전한 HTTPS 엔드포인트를 제공합니다.
-- **프로젝트 무중단 전환 지원**:
-  - `.env`에서 `MCP_WORKSPACE_ROOT`만 변경하면 기존 ChatGPT 인증 세션을 유지한 채로 작업 폴더를 즉시 전환할 수 있습니다.
+또한 Godot, Blender 등 별도의 Remote MCP를 **Provider**로 연결할 수 있어 하나의 Gateway에서 다양한 개발 도구를 함께 사용할 수 있습니다.
 
 ---
 
-## 🏗️ 시스템 아키텍처
+## 주요 특징
 
-```
-┌────────────────────────────────────────────────────────┐
-│                   ChatGPT (Web / App)                  │
-└───────────────────────────┬────────────────────────────┘
-                            │ HTTPS (Streamable HTTP / OAuth 2.1)
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│        Cloudflare Zero Trust Tunnel (mcp.yourdomain)   │
-└───────────────────────────┬────────────────────────────┘
-                            │ Local Proxy (HTTP localhost:<MCP_PORT>)
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│            Windows Scoped Remote MCP Server            │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Express Router (/mcp, /authorize, /openapi.json) │  │
-│  └────────────────────────┬─────────────────────────┘  │
-│                           │                            │
-│  ┌────────────────────────▼─────────────────────────┐  │
-│  │   SandboxGuard & ProcessManager & FileService    │  │
-│  └────────────────────────┬─────────────────────────┘  │
-└───────────────────────────┼────────────────────────────┘
-                            │ 격리된 파일 & 명령어 실행
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│       내 로컬 작업 공간 (MCP_WORKSPACE_ROOT)            │
-│      예: D:\Godot\mcp-test 또는 D:\Godot\MyGame         │
-└────────────────────────────────────────────────────────┘
-```
+- **Windows SandboxGuard** — 설정한 Workspace 경계 안에서 파일과 명령 실행을 제한합니다.
+- **Multi-Workspace** — 여러 프로젝트를 등록하고 활성 Workspace를 전환할 수 있습니다.
+- **파일/코드 관리** — 조회, 생성, 수정, 이동, 복사, 삭제, patch 적용 등을 지원합니다.
+- **PowerShell / CMD / 프로세스 관리** — 개발 명령 실행과 백그라운드 프로세스를 관리합니다.
+- **Playwright 브라우저 자동화** — 실제 브라우저를 열고 탐색, 입력, 클릭, 스크린샷 등을 수행합니다.
+- **Remote MCP Provider** — Godot, Blender 등 원하는 MCP를 Gateway에 추가할 수 있습니다.
+- **Provider 장애 격리** — 하나의 MCP가 꺼져 있어도 WSR Core와 다른 Provider는 계속 사용할 수 있습니다.
+- **Provider Scheduler** — MCP의 연결 상태와 `tools/list`를 주기적으로 확인하고 자동 재연결 및 Tool Registry 갱신을 수행합니다.
+- **OAuth 2.1 / Cloudflare Tunnel 지원** — 원격 MCP 클라이언트와 안전하게 연결할 수 있는 구성을 제공합니다.
 
 ---
 
-## 🛠️ 제공 도구 목록 (총 30 Tools)
-
-### 🌐 1. 브라우저 자동화 & 웹 테스트 도구 (Playwright 8 Tools)
-| 도구명 (Tool) | 설명 |
-| :--- | :--- |
-| **`browser_navigate`** | 웹사이트 주소(URL)로 브라우저 이동 및 페이지 로드 |
-| **`browser_screenshot`** | 현재 웹 화면 스크린샷 캡처 및 작업 폴더에 이미지 파일(PNG) 저장 |
-| **`browser_click`** | 버튼, 링크 등 특정 HTML 요소를 마우스 클릭 |
-| **`browser_fill`** | 검색창, 입력 폼에 텍스트 자동 타이핑 및 입력 |
-| **`browser_get_content`** | 웹페이지 본문 텍스트 또는 HTML 소스 추출 |
-| **`browser_evaluate`** | 브라우저 콘솔에서 자바스크립트(JS) 코드 실행 및 결과 수집 |
-| **`browser_press_key`** | 키보드 키(Enter, Tab, Escape, 화살표 등) 입력 |
-| **`browser_close`** | 브라우저 세션 종료 및 메모리 해제 |
-
-### 📂 2. 다중 워크스페이스 관리 도구 (3 Tools)
-| 도구명 (Tool) | 설명 |
-| :--- | :--- |
-| **`list_workspaces`** | 등록된 모든 다중 워크스페이스 목록, 별칭(Alias), 활성화 상태 조회 |
-| **`get_active_workspace`** | 현재 활성화된 기본 작업 공간의 이름과 절대 경로 조회 |
-| **`switch_workspace`** | 별칭(Alias) 또는 경로로 활성 작업 공간을 실시간 전환 |
-
-### 📁 3. 파일 및 코드 조작 도구 (11 Tools)
-| 도구명 (Tool) | 설명 |
-| :--- | :--- |
-| **`list_directory`** | 지정한 경로의 파일 및 하위 디렉토리 목록 조회 |
-| **`read_file`** | 텍스트 파일 읽기 (오프셋 및 분할 읽기 지원) |
-| **`write_file`** | 신규 파일 생성 및 덮어쓰기/이어쓰기 |
-| **`edit_file`** | 특정 줄 번호 및 블록 단위의 정확한 코드 수정 |
-| **`replace_in_file`** | 문자열 검색 및 대상 텍스트 일괄/단일 교체 |
-| **`apply_patch`** | 표준 Unified Diff / Patch 형식으로 파일에 패치 적용 |
-| **`make_directory`** | 신규 디렉토리 생성 |
-| **`delete_file`** | 파일 및 빈 디렉토리 삭제 |
-| **`move_file`** | 파일/폴더 이동 및 이름 변경 |
-| **`copy_file`** | 파일/폴더 복사 |
-| **`stat_path`** | 파일/폴더의 크기, 수정일, 속성 메타데이터 조회 |
-
-### ⚡ 4. 터미널 명령어 및 스크립트 실행 도구 (8 Tools)
-| 도구명 (Tool) | 설명 |
-| :--- | :--- |
-| **`search_files`** | Glob 패턴으로 파일명 검색 |
-| **`find_in_files`** | 파일 내부 텍스트 및 정규식 고속 검색 |
-| **`exec_command`** | PowerShell 또는 CMD 명령어를 실행하고 결과 반환 |
-| **`run_script`** | PowerShell, Batch, Node.js, Python 스크립트 실행 |
-| **`read_process_output`** | 장기 실행 중인 백그라운드 프로세스의 출력 버퍼 읽기 |
-| **`write_process_input`** | 실행 중인 프로세스의 표준 입력(stdin)으로 데이터 전송 |
-| **`stop_process`** | 백그라운드 프로세스 종료 |
-| **`list_processes`** | 현재 실행 중인 프로세스 목록 및 상태 조회 |
-
----
-
-## ⚙️ 1. 환경 설정 가이드 (`.env`)
-
-프로젝트 루트의 `.env.example` 파일을 복사하여 `.env` 파일을 생성한 후 설정합니다:
-
-```cmd
-copy .env.example .env
-```
-
-### 📋 주요 설정 항목 상세 설명
-
-| 환경 변수 | 기본값 / 예시 | 필수 여부 | 설명 |
-| :--- | :--- | :---: | :--- |
-| **`MCP_PORT`** | `12000` | 선택 | 로컬에서 Express 서버가 실행될 포트 번호 (기본값: `12000`) |
-| **`MCP_WORKSPACE_ROOTS`** | `test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle` | **필수** | **ChatGPT가 조작할 수 있는 다중 작업 공간 (별칭:경로)** |
-| **`MCP_AUTH_TOKEN`** | `your_secure_password` | **필수** | **ChatGPT OAuth 승인 페이지(`/authorize`)에서 입력할 보안 비밀번호** |
-| **`MCP_PUBLIC_URL`** | `https://mcp.yourdomain.com` | **필수** | Cloudflare Tunnel을 통해 외부에 노출되는 공개 HTTPS 주소 |
-| **`CLOUDFLARE_TUNNEL_TOKEN`** | `your_tunnel_token` | 선택 | Cloudflare Zero Trust 대시보드에서 발급받은 고정 터널 토큰 |
-| **`MCP_DEFAULT_SHELL`** | `powershell` | 선택 | `exec_command` 실행 시 기본 쉘 (`powershell`, `cmd`, `pwsh`) |
-| **`MCP_BROWSER_HEADLESS`** | `false` | 선택 | `false` 설정 시 **내 모니터에 실제 브라우저 창을 띄움**, `true`는 백그라운드 숨김 |
-| **`MCP_MAX_FILE_CHUNK_BYTES`** | `1048576` (1MB) | 선택 | `read_file` 1회 최대 읽기 바이트 크기 |
-| **`MCP_MAX_EDIT_FILE_BYTES`** | `67108864` (64MB) | 선택 | `edit_file` / `write_file` 최대 수정 가능 파일 크기 |
-| **`MCP_MAX_OUTPUT_BYTES`** | `1048576` (1MB) | 선택 | 터미널 명령어 실행 출력 버퍼 최대 크기 |
-
-```dotenv
-# [Server Port]
-MCP_PORT=12000
-
-# [Multi-Root Security & Directory Sandbox]
-MCP_WORKSPACE_ROOTS=test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle, server:C:\path\to\localRemoteMcp
-
-# [Authentication - ChatGPT OAuth 2.1]
-MCP_AUTH_TOKEN=your_secure_password_here
-
-# [Public Domain & Cloudflare Tunnel]
-MCP_PUBLIC_URL=https://mcp.yourdomain.com
-CLOUDFLARE_TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
-
-# [Shell & Browser Configuration]
-MCP_DEFAULT_SHELL=powershell
-MCP_BROWSER_HEADLESS=false
-
-# [Limits - Safety Guardrails]
-MCP_MAX_FILE_CHUNK_BYTES=1048576
-MCP_MAX_EDIT_FILE_BYTES=67108864
-MCP_MAX_OUTPUT_BYTES=1048576
-```
-
----
-
-## 🌐 2. Cloudflare Tunnel 및 도메인 연동
-
-본 서버는 Cloudflare Zero Trust 터널을 통해 `.env`에 지정된 로컬 포트(`MCP_PORT`, 기본값: `12000`)를 보유하신 도메인의 서브도메인(`https://mcp.yourdomain.com`)으로 안전하게 노출합니다.
-
-### 🔌 Cloudflare 대시보드 설정
-1. [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) ➔ **Networks** ➔ **Tunnels** 메뉴로 이동합니다.
-2. **[Create a tunnel]**을 클릭하여 Cloudflared 터널을 생성합니다.
-3. **Public Hostname** 추가:
-   - **Subdomain**: `mcp` (또는 원하는 서브도메인)
-   - **Domain**: `yourdomain.com` (보유하신 도메인 선택)
-   - **Service Type**: `HTTP`
-   - **URL**: `localhost:<MCP_PORT>` (예: `localhost:12000`)
-4. 발급된 **터널 토큰(Token)**을 복사하여 `.env`의 `CLOUDFLARE_TUNNEL_TOKEN` 항목에 붙여넣습니다.
-
----
-
-## 📦 3. Cloudflare 바이너리 (`bin/cloudflared.exe`) 안내
-
-본 프로젝트는 터널을 자동으로 시작하기 위해 `cloudflared.exe` 바이너리를 사용합니다.
-
-- **자동 다운로드 지원 (권장)**:
-  - `start.bat` 또는 `start.ps1`을 최초 실행할 때 `bin/cloudflared.exe`가 없으면 **공식 Cloudflare GitHub Release에서 최신 바이너리를 자동으로 다운로드**하여 배치합니다.
-  - 사용자가 별도로 다운로드할 필요 없이 `start.bat`만 실행하면 됩니다.
-- **수동 다운로드 (오프라인 / 방화벽 환경)**:
-  - 자동 다운로드가 제한된 환경인 경우, [Cloudflare 공식 릴리즈 페이지](https://github.com/cloudflare/cloudflared/releases)에서 `cloudflared-windows-amd64.exe` 파일을 다운로드한 뒤, 프로젝트 내 `bin/cloudflared.exe` 경로로 이름을 바꾸어 넣어주시면 됩니다.
-
----
-
-## 🚀 4. 서버 실행 방법
-
-### 방법 A. 원클릭 자동 실행 (`start.bat` / 권장)
-`start.bat`을 더블 클릭하거나 콘솔에서 실행합니다:
-```cmd
-start.bat
-```
-*(자동으로 npm 패키지 설치 ➔ .env 확인 ➔ cloudflared 바이너리 확인 ➔ TypeScript 빌드 및 서버 + 터널을 한 번에 실행합니다)*
-
-### 방법 B. 수동 터미널 실행
-```bash
-# 1. 의존성 설치
-npm install
-
-# 2. TypeScript 컴파일
-npm run build
-
-# 3. 테스트 실행
-npm test
-
-# 4. 서버 시작
-npm start
-```
-
----
-
-## 🤖 5. ChatGPT 앱 / 플러그인 연결 가이드 (단계별)
-
-### 1단계. ChatGPT 앱 등록
-1. [ChatGPT 웹](https://chatgpt.com/)에 접속하여 **[설정] ➔ [플러그인 / 개발자 모드]**로 이동합니다.
-2. **[+ 새 플러그인 / 앱 만들기]**를 클릭합니다.
-3. 설정값을 다음과 같이 입력합니다:
-   - **이름**: `my-remote` (또는 원하는 이름)
-   - **연결 (Connection)**: `서버 URL` ➔ **`https://mcp.yourdomain.com/mcp`** (본인 도메인)
-   - **인증 (Authentication)**: **`OAuth`** 선택
-4. **[만들기]**를 클릭합니다.
-
-### 2단계. 보안 로그인 승인
-1. 등록된 앱 상세 화면에서 **`[연결 ➔]`** 버튼을 누릅니다.
-2. 브라우저 팝업으로 **[Windows Scoped Remote MCP 승인]** 웹 페이지가 나타납니다.
-3. 비밀번호 입력란에 `.env`에 설정된 **`MCP_AUTH_TOKEN`** 값을 입력하고 **[승인하고 ChatGPT로 돌아가기]**를 클릭합니다.
-
-### 3단계. 권한 설정 ("모든 액션 허용")
-- 앱 상세 화면의 **권한 (Permissions)** 옵션을 **`모든 액션 허용`**으로 설정합니다.
-- *(도구를 호출할 때마다 매번 확인 팝업이 뜨지 않고 ChatGPT가 자율적으로 개발을 진행합니다)*
-
----
-
-## 💬 6. 실전 대화형 개발 프롬프트 예시
-
-새 채팅창(또는 `@ 플러그인` 채팅창)에서 다음과 같이 지시할 수 있습니다:
+## 아키텍처
 
 ```text
-# 1. 프로젝트 파일 목록 및 구조 파악
-@my-remote 현재 작업 공간의 파일과 폴더 목록을 정리해서 보여줘
-
-# 2. 웹 게임 / 프론트엔드 프로젝트 개발
-@my-remote HTML5 Canvas로 브라우저에서 실행 가능한 레트로풍 벽돌깨기 게임(breakout.html)을 세련되게 만들어줘
-
-# 3. Godot 4 게임 스크립트 작성
-@my-remote Godot 4 기준으로 2D 캐릭터 이동, 대시, 점프 및 물리 충돌을 처리하는 Player.gd를 작성해줘
-
-# 4. 패키지 설치 및 테스트 실행
-@my-remote npm install 명령어로 필요한 라이브러리를 설치하고 npm test를 돌려 결과를 확인해줘
-
-# 5. 웹 브라우저 자동화 & 화면 캡처 (Playwright)
-@my-remote 네이버(naver.com)로 이동해서 검색창에 'Godot Engine 4' 검색하고 결과 페이지 스크린샷 찍어서 search.png로 저장해줘
-
-# 6. 내가 만든 로컬 웹페이지 실시간 검증
-@my-remote 로컬 웹서버를 실행하고 브라우저로 접속해서 [게임 시작] 버튼을 누른 다음 화면이 잘 나오는지 스크린샷으로 확인해줘
+                         ChatGPT / Claude
+                                │
+                         MCP / HTTPS
+                                │
+                       Cloudflare Tunnel
+                                │
+                                ▼
+                 Windows Scoped Remote MCP Server
+                                │
+              ┌─────────────────┼─────────────────┐
+              │                 │                 │
+           Workspace        Playwright          Providers
+              │                 │                 │
+       Files / Process      Browser tools    ┌────┼─────┐
+                                             │    │     │
+                                           Godot Blender ...
+                                             │    │
+                                         godot_* blender_*
 ```
+
+WSR 자체는 Gateway 역할을 하고, 외부 MCP는 `RemoteMcpProvider`를 통해 연결합니다.
 
 ---
 
-## 📂 7. 다중 프로젝트 관리 및 실시간 전환 방법
+## Remote MCP Provider
 
-본 서버는 **다중 워크스페이스(Multi-Workspace)**를 지원하므로, 여러 프로젝트를 동시에 등록하고 대화 도중 실시간으로 전환할 수 있습니다.
+사용자마다 필요한 MCP가 다르므로 WSR은 특정 MCP 하나에 종속되지 않습니다.
 
-### 방법 A. ChatGPT 대화로 실시간 전환 (서버 재부팅 없음 ⭐)
-1. **현재 작업 공간 확인**:
-   ```text
-   @my-remote 현재 작업 공간이 어디로 설정되어 있는지 확인해줘
-   ```
-2. **등록된 전체 프로젝트 목록 확인**:
-   ```text
-   @my-remote 등록된 모든 워크스페이스 목록을 보여줘
-   ```
-3. **작업 공간 즉시 전환**:
-   ```text
-   @my-remote ether 프로젝트로 작업 공간을 전환해줘
-   ```
-   *(ChatGPT가 `switch_workspace(name: "ether")` 도구를 호출하여 서버 재부팅 없이 즉시 해당 프로젝트로 전환합니다)*
-
-### 방법 B. 새 프로젝트 추가 등록 (`.env`)
-1. `.env` 파일의 `MCP_WORKSPACE_ROOTS`에 새로운 프로젝트 별칭과 경로를 추가합니다:
-   ```dotenv
-   MCP_WORKSPACE_ROOTS=test:C:\path\to\mcp-test, ether:C:\path\to\ether-chronicle, mygame:C:\path\to\mygame
-   ```
-2. 터미널에서 `start.bat`을 재실행하면 추가된 프로젝트들도 즉시 접근 및 전환이 가능해집니다. (OAuth 인증 토큰 세션은 영구 보존됩니다)
-
----
-
-## 🔒 8. 보안 및 문제 해결
-
-- **Q. 외부인이 내 컴퓨터에 무단 접속할 위험은 없나요?**
-  - **3중 보안 구조**로 완벽하게 보호됩니다:
-    1. **비밀번호 인증**: `MCP_AUTH_TOKEN` 비밀번호를 아는 본인의 ChatGPT 계정만 접근 가능.
-    2. **샌드박스 격리**: 파일 및 명령어가 오직 지정된 `MCP_WORKSPACE_ROOT` 내에서만 작동하며 상위 경로 접근 시 즉시 차단.
-    3. **Cloudflare Zero Trust**: Cloudflare 대시보드에서 내 IP만 허용하는 방화벽 규칙을 추가할 수 있습니다.
-- **Q. 터널이 연결되지 않거나 502 에러가 날 때**:
-  - `start.bat` 창에서 로컬 서버(`port: .env의 MCP_PORT`)가 정상적으로 켜져 있는지 확인하고, 브라우저에서 `https://mcp.yourdomain.com/health`로 접속하여 `{ status: "ok" }` 응답이 나오는지 확인합니다.
-
----
-
-## MCP 확장하기: 원하는 MCP를 추가해서 사용하기
-
-이 프로젝트는 모든 사용자가 같은 MCP를 사용할 필요가 없도록 Remote MCP Provider 구조를 사용합니다.
-
-Godot, Blender, 디자인 도구, 데이터베이스 등 사용하려는 MCP가 다르더라도 기존 Gateway를 다시 만들 필요 없이 원하는 MCP를 Provider로 추가할 수 있습니다.
-
-### 가장 쉬운 방법: ChatGPT에게 추가를 요청하세요
-
-이 프로젝트를 처음 받았다면 직접 코드를 수정하기 전에 ChatGPT에게 다음처럼 요청할 수 있습니다.
+예를 들어:
 
 ```text
-이 windows-scoped-remote-mcp-server 프로젝트에 Blender MCP를 추가해줘.
-현재 프로젝트의 AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
-기존 Provider/Gateway 구조를 따라 추가해줘.
-Blender MCP의 연결 방법과 필요한 설정을 확인한 다음,
-blender_* namespace를 사용하고 테스트와 문서까지 추가해줘.
-기존 Workspace와 Playwright 기능은 변경하지 말고,
-typecheck와 전체 테스트를 통과한 뒤 Git checkpoint까지 만들어줘.
+WSR
+├── Godot MCP
+├── Blender MCP
+├── Playwright
+└── 사용자가 추가한 MCP
 ```
 
-다른 MCP도 같은 방식으로 요청할 수 있습니다.
-
-```text
-이 프로젝트에 <원하는 MCP>를 추가해줘.
-AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
-기존 RemoteMcpProvider 구조를 재사용해줘.
-```
-
-### MCP 추가 시 지켜야 하는 구조
-
-```text
-Windows Scoped Remote MCP
-        │
- ProviderRegistry
-        │
- ┌──────┼────────┐
- │      │        │
-Godot Blender  Future MCP
- │      │        │
-godot_* blender_* <provider>_*
-```
-
-각 MCP는 고유한 namespace를 사용합니다.
+각 Provider에는 namespace를 사용합니다.
 
 | MCP | Namespace 예시 |
 | :--- | :--- |
 | Godot | `godot_*` |
 | Blender | `blender_*` |
-| Playwright | `browser_*` |
+| Browser | `browser_*` |
 | 새로운 MCP | `<provider>_*` |
 
-예를 들어 Blender MCP가 `get_scene`이라는 tool을 제공하더라도 ChatGPT에는 `blender_get_scene`으로 노출합니다. Gateway가 호출할 때 다시 원래 MCP의 `get_scene`으로 전달합니다.
+예를 들어 Blender MCP의 `get_scene`은 WSR에서 `blender_get_scene`으로 노출됩니다.
 
-### MCP를 직접 추가해야 한다면
+### MCP를 추가하는 가장 쉬운 방법
 
-1. `AGENT.md`를 먼저 읽습니다.
-2. `skills/add-remote-mcp-provider/SKILL.md`를 읽습니다.
-3. MCP의 공식 연결 방식과 endpoint를 확인합니다.
-4. `RemoteMcpProvider`를 재사용합니다.
-5. 고유 namespace를 지정합니다.
-6. JSON Schema와 tool 목록을 검증합니다.
-7. Provider 단위 테스트를 추가합니다.
-8. `npm run typecheck`와 `npm test`를 실행합니다.
-9. WSR을 재시작합니다.
-10. ChatGPT에서 MCP 도구 목록을 새로 고침합니다.
-11. 읽기 전용 tool부터 실제 호출을 테스트합니다.
-12. 정상 확인 후 Git checkpoint를 생성합니다.
+프로젝트를 받은 후 ChatGPT에게 다음처럼 요청할 수 있습니다.
 
-### 중요한 원칙
+```text
+이 windows-scoped-remote-mcp-server 프로젝트에 Blender MCP를 추가해줘.
+AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
+기존 RemoteMcpProvider / ProviderRegistry 구조를 따라 작업해줘.
+Blender MCP의 연결 방법과 필요한 설정을 확인하고
+blender_* namespace를 사용해줘.
+테스트와 문서도 업데이트하고 typecheck와 전체 테스트까지 실행해줘.
+```
 
-- MCP마다 별도의 구현을 Gateway에 복제하지 않습니다.
-- 가능하면 `RemoteMcpProvider` 하나를 재사용합니다.
-- MCP tool 이름 충돌을 막기 위해 namespace를 반드시 사용합니다.
-- 원격 MCP의 JSON Schema를 임의로 단순화하지 않습니다.
-- 새로운 MCP를 추가해도 기존 Workspace, Playwright, 다른 Provider가 영향을 받지 않도록 합니다.
-- MCP 연결 정보, 토큰, 비밀번호 등의 민감한 값은 Git에 커밋하지 않습니다.
+자세한 절차는 `skills/add-remote-mcp-provider/SKILL.md`를 참고하세요.
 
-자세한 내용은 다음 문서를 참고하세요.
+---
 
-- `AGENT.md` — 이 프로젝트의 작업 규칙
-- `docs/mcp-gateway-architecture.md` — Gateway/Provider 구조
-- `skills/add-remote-mcp-provider/SKILL.md` — 새로운 MCP 추가 절차
-- `skills/test-mcp-provider/SKILL.md` — Provider 테스트 방법
-- `skills/debug-mcp-gateway/SKILL.md` — MCP 연결 및 도구 오류 진단
+## Provider가 꺼져 있어도 WSR은 계속 실행됩니다
 
-## 📄 라이선스
+Remote MCP는 선택적 의존성입니다.
+
+```text
+Godot MCP OFF
+     │
+     ▼
+Godot Provider = unavailable
+     │
+     ├── WSR Core       → 계속 사용 가능
+     ├── Playwright     → 계속 사용 가능
+     └── 다른 Provider  → 계속 사용 가능
+```
+
+Provider 연결 실패 때문에 WSR 전체가 종료되지 않습니다.
+
+Provider-specific tool을 호출했을 때 연결되어 있지 않으면 명확한 오류를 반환합니다.
+
+```text
+MCP provider 'godot' (godot) is not connected.
+Start the godot MCP server/editor and try again.
+```
+
+현재 상태는 `mcp_provider_status` tool로 확인할 수 있습니다.
+
+---
+
+## Provider Scheduler
+
+WSR은 `ProviderScheduler`를 백그라운드에서 실행하여 Remote MCP의 상태를 지속적으로 관리합니다.
+
+```text
+                    ProviderScheduler
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+        CONNECTED                    UNAVAILABLE
+             │                           │
+        tools/list                    reconnect
+             │                           │
+       변경 여부 확인                tools/list
+             │                           │
+             └─────────────┬─────────────┘
+                           ▼
+                    Tool Registry 갱신
+```
+
+기본값:
+
+- 연결된 Provider health check: **10초**
+- 연결되지 않은 Provider retry: **5초**
+
+환경변수로 변경할 수 있습니다.
+
+```env
+MCP_PROVIDER_HEALTH_INTERVAL_MS=10000
+MCP_PROVIDER_RETRY_INTERVAL_MS=5000
+```
+
+### MCP를 켰다 꺼도 자동으로 따라갑니다
+
+```text
+WSR 실행
+   ↓
+Godot OFF
+   ↓
+Provider unavailable
+   ↓
+Godot 실행
+   ↓
+Scheduler가 자동 발견
+   ↓
+tools/list
+   ↓
+godot_* Tool Registry 갱신
+```
+
+따라서 Provider를 켜거나 다시 실행하기 위해 WSR 자체를 재시작할 필요가 없습니다.
+
+Remote MCP의 Tool 정의가 변경되면 `tools/list` 결과를 비교하여 Registry snapshot도 갱신합니다.
+
+현재 HTTP 계층은 MCP 요청마다 Server를 구성하는 구조이므로 다음 `tools/list` 요청에 최신 Tool Registry가 반영됩니다. 장기 세션에서 클라이언트 UI까지 즉시 알림을 보내는 `tools/list_changed` notification은 향후 세션 관리 구조와 함께 확장할 수 있습니다.
+
+---
+
+## Multi-Workspace
+
+여러 프로젝트를 하나의 WSR에서 관리할 수 있습니다.
+
+```env
+MCP_WORKSPACE_ROOTS=game:D:\Godot\MyGame,tools:D:\project\tools,reference:D:\project\reference
+MCP_WORKSPACE_ROOT=D:\Godot\MyGame
+```
+
+현재 활성 Workspace는 기본 작업 대상으로 사용하고, 다른 등록 Workspace는 교차 Workspace 기능을 통해 읽기/검색/분석/복사 중심으로 사용할 수 있습니다.
+
+Workspace 경계를 벗어난 파일 및 명령 접근은 SandboxGuard가 차단합니다.
+
+---
+
+## Playwright
+
+Playwright가 통합되어 실제 브라우저를 MCP를 통해 조작할 수 있습니다.
+
+```text
+ChatGPT
+   ↓
+"브라우저에서 페이지를 열고 버튼을 눌러줘"
+   ↓
+WSR
+   ↓
+Playwright
+   ↓
+실제 브라우저
+```
+
+지원 예:
+
+- URL 이동
+- 요소 클릭
+- 입력/폼 작성
+- 키보드 입력
+- 페이지 내용 조회
+- JavaScript 평가
+- 스크린샷
+- 브라우저 세션 관리
+
+---
+
+## 설치
+
+```cmd
+git clone <repository-url>
+cd windows-scoped-remote-mcp-server
+npm install
+copy .env.example .env
+npm run build
+npm test
+```
+
+Windows에서는 `start.bat`를 사용하는 방법도 지원합니다.
+
+```cmd
+start.bat
+```
+
+---
+
+## 주요 환경변수
+
+| 변수 | 기본값 | 설명 |
+| :--- | :--- | :--- |
+| `MCP_PORT` | `12000` | WSR HTTP 서버 포트 |
+| `MCP_WORKSPACE_ROOT` | 현재 경로 | 활성 Workspace |
+| `MCP_WORKSPACE_ROOTS` | `MCP_WORKSPACE_ROOT` | Multi-Workspace 목록 |
+| `MCP_AUTH_TOKEN` | 없음 | 인증용 토큰 |
+| `MCP_PUBLIC_URL` | 없음 | 공개 MCP URL |
+| `CLOUDFLARE_TUNNEL_TOKEN` | 없음 | Cloudflare Tunnel 토큰 |
+| `MCP_BROWSER_HEADLESS` | `false` | Playwright Headless 여부 |
+| `MCP_PROVIDER_HEALTH_INTERVAL_MS` | `10000` | 연결된 Provider 검사 주기(ms) |
+| `MCP_PROVIDER_RETRY_INTERVAL_MS` | `5000` | 연결되지 않은 Provider 재연결 주기(ms) |
+| `MCP_GODOT_ENABLED` | `false` | Godot MCP Provider 활성화 |
+| `MCP_GODOT_URL` | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint |
+
+민감한 토큰과 비밀번호는 `.env`에만 저장하고 Git에 커밋하지 마세요.
+
+---
+
+## 개발
+
+```cmd
+npm run typecheck
+npm test
+npm run build
+```
+
+새 MCP Provider를 추가할 때는 다음 문서를 먼저 읽는 것을 권장합니다.
+
+- `AGENT.md` — 프로젝트 작업 규칙
+- `docs/mcp-gateway-architecture.md` — Gateway / Provider 구조
+- `skills/add-remote-mcp-provider/SKILL.md` — MCP 추가 절차
+- `skills/test-mcp-provider/SKILL.md` — Provider 테스트
+- `skills/debug-mcp-gateway/SKILL.md` — MCP 문제 해결
+
+---
+
+## 실제 검증 사례
+
+현재 WSR은 Godot MCP와 실제 연결하여 다음 작업을 검증했습니다.
+
+```text
+ChatGPT
+  ↓
+WSR
+  ↓
+Godot MCP
+  ↓
+Godot Editor
+  ↓
+Scene 생성 / 수정 / 저장
+```
+
+테스트 Scene:
+
+```text
+res://mcp_test.tscn
+
+McpTest (Node3D)
+├── TestCube (MeshInstance3D)
+├── Camera3D
+└── DirectionalLight3D
+```
+
+이 흐름은 WSR이 단순한 파일 MCP가 아니라 실제 개발 도구를 연결하는 Gateway라는 것을 보여주는 대표적인 테스트 사례입니다.
+
+---
+
+## 보안 원칙
+
+WSR은 개발 자동화를 위해 강력한 기능을 제공하므로 다음 원칙을 중요하게 취급합니다.
+
+- Workspace 외부 접근을 SandboxGuard로 제한합니다.
+- 다른 Workspace를 수정하지 않도록 교차 Workspace 권한을 분리합니다.
+- 인증 토큰과 Cloudflare Tunnel 토큰을 소스 코드에 저장하지 않습니다.
+- 보안 기능을 절대적인 안전 보장으로 표현하지 않고 설정된 경계와 권한 모델을 기준으로 설명합니다.
+- 원격 MCP Provider 하나의 장애가 전체 Gateway 장애로 이어지지 않도록 격리합니다.
+
+---
+
+## License
+
 MIT License

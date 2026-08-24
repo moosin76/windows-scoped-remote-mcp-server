@@ -38,6 +38,8 @@ export interface AppConfig {
   cloudflareTunnelToken: string | undefined;
   godotMcpEnabled: boolean;
   godotMcpUrl: string;
+  mcpProviderHealthIntervalMs: number;
+  mcpProviderRetryIntervalMs: number;
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -175,5 +177,7 @@ export function loadConfig(
     cloudflareTunnelToken,
     godotMcpEnabled,
     godotMcpUrl,
+    mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),
+    mcpProviderRetryIntervalMs: parseInteger(env.MCP_PROVIDER_RETRY_INTERVAL_MS, 5_000, "MCP_PROVIDER_RETRY_INTERVAL_MS", 1_000, 3_600_000),
   };
 }

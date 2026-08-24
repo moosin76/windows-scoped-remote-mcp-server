@@ -7,6 +7,7 @@ import { startCloudflareTunnel } from "./tunnel.js";
 import { WorkspaceManager } from "./workspace.js";
 import { BrowserManager } from "./browser-manager.js";
 import { createProviderRegistry } from "./providers/provider-factory.js";
+import { ProviderScheduler } from "./providers/provider-scheduler.js";
 
 async function main() {
   const config = loadConfig(process.env, process.cwd());
@@ -61,10 +62,16 @@ async function main() {
     }
   }
 
-  // Keep optional remote providers discoverable without restarting WSR.
-  const providerDiscoveryTimer = providerRegistry.list().length > 0
-    ? setInterval(() => void providerRegistry.discoverAvailable(), 5_000)
-    : undefined;
+  // Keep optional remote providers healthy and discoverable without restarting WSR.
+  const providerScheduler = new ProviderScheduler(providerRegistry, {
+    intervalMs: config.mcpProviderHealthIntervalMs,
+    retryIntervalMs: config.mcpProviderRetryIntervalMs,
+    onToolsChanged: (providerId) => {
+      const count = providerRegistry.listCachedTools().filter((tool) => tool.providerId === providerId).length;
+      console.log(`[MCP Provider Scheduler] '${providerId}' tool registry refreshed (${count} tools)`);
+    },
+  });
+  providerScheduler.start();
   const fileService = new FileService({
     sandbox,
     maxChunkBytes: config.maxFileChunkBytes,
@@ -94,7 +101,7 @@ async function main() {
     if (tunnel) {
       tunnel.stop();
     }
-    if (providerDiscoveryTimer) clearInterval(providerDiscoveryTimer);
+    await providerScheduler.stop().catch(() => {});
     await providerRegistry.closeAll().catch(() => {});
     await browserManager.close().catch(() => {});
     await runningServer.close().catch(() => {});

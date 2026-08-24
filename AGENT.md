@@ -167,3 +167,21 @@ Remote MCP Provider는 선택 기능으로 취급합니다.
 - 이미 등록된 Provider tool의 호출 중 연결이 끊어지면 사용자에게 어떤 Provider가 꺼져 있는지와 재시작해야 할 대상을 명확하게 반환합니다.
 - 가능하면 Provider 호출 시 재연결을 한 번 시도한 후 실패를 사용자 친화적인 MCP tool error로 반환합니다.
 - 새로운 Provider를 추가할 때도 이 원칙을 유지합니다.
+
+## Remote MCP Provider 운영 원칙
+
+Remote MCP Provider는 선택적 의존성으로 취급한다. 하나의 Provider가 꺼지거나 일시적으로 장애가 발생해도 WSR Core 기능과 다른 Provider가 영향을 받지 않아야 한다.
+
+`ProviderScheduler`는 백그라운드에서 다음을 담당한다.
+
+- 연결된 Provider health check
+- 연결되지 않은 Provider 자동 재연결
+- `tools/list` 재조회
+- Tool snapshot 변경 감지
+- Provider 상태 로그
+
+기본값은 health check 10초, retry 5초이며 `MCP_PROVIDER_HEALTH_INTERVAL_MS`와 `MCP_PROVIDER_RETRY_INTERVAL_MS`로 변경할 수 있다.
+
+Provider tool 호출이 실패할 경우 Gateway를 종료하지 말고 사용자에게 Provider가 unavailable임을 명확하게 반환한다.
+
+현재 WSR은 요청마다 MCP Server를 구성하므로 Scheduler가 갱신한 Registry snapshot은 다음 `tools/list` 요청에 반영된다. 장기 세션과 `tools/list_changed` notification은 별도의 세션 관리 작업으로 다룬다.
