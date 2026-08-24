@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ProviderRegistry } from "../src/providers/provider-registry.js";
 import type { McpProvider } from "../src/providers/mcp-provider.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
@@ -55,6 +55,18 @@ describe("ProviderRegistry", () => {
     }]);
   });
 
+  it("rediscovers a provider that becomes available later", async () => {
+    const registry = new ProviderRegistry();
+    const provider = fakeProvider("godot", "godot", ["get_scene"]);
+    let connected = false;
+    provider.connect = async () => { connected = true; };
+    provider.isConnected = () => connected;
+    registry.add(provider);
+
+    await registry.discoverAvailable();
+    expect(registry.listCachedTools()).toHaveLength(1);
+    expect(registry.listCachedTools()[0]?.tool.name).toBe("godot_get_scene");
+  });
   it("resolves a namespaced call to its provider", () => {
     const registry = new ProviderRegistry();
     registry.add(fakeProvider("godot", "godot", ["get_scene"]));

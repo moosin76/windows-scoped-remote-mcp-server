@@ -61,6 +61,10 @@ async function main() {
     }
   }
 
+  // Keep optional remote providers discoverable without restarting WSR.
+  const providerDiscoveryTimer = providerRegistry.list().length > 0
+    ? setInterval(() => void providerRegistry.discoverAvailable(), 5_000)
+    : undefined;
   const fileService = new FileService({
     sandbox,
     maxChunkBytes: config.maxFileChunkBytes,
@@ -90,6 +94,7 @@ async function main() {
     if (tunnel) {
       tunnel.stop();
     }
+    if (providerDiscoveryTimer) clearInterval(providerDiscoveryTimer);
     await providerRegistry.closeAll().catch(() => {});
     await browserManager.close().catch(() => {});
     await runningServer.close().catch(() => {});

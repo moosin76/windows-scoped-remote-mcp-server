@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { Server as HttpServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createOAuthMetadata, mcpAuthRouter, type AuthRouterOptions } from "@modelcontextprotocol/sdk/server/auth/router.js";
@@ -253,7 +253,7 @@ export async function startHttpServer(
       enableJsonResponse: true,
     });
 
-    const mcpServer = createMcpServer(
+    const mcpServer = await createMcpServer(
       config,
       processManager,
       fileService,

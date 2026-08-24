@@ -1,4 +1,4 @@
-﻿import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { McpProvider } from "./mcp-provider.js";
 
 export interface NamespacedTool {
@@ -19,6 +19,8 @@ export interface ProviderStatus {
 export class ProviderRegistry {
   private readonly providers = new Map<string, McpProvider>();
   private readonly toolSnapshots = new Map<string, readonly NamespacedTool[]>();
+  private readonly lastDiscoveryAttempt = new Map<string, number>();
+  private readonly discoveryRetryMs = 5_000;
 
   add(provider: McpProvider): void {
     if (this.providers.has(provider.id)) {
@@ -59,6 +61,26 @@ export class ProviderRegistry {
     }
   }
 
+  /**
+   * Discover providers that are currently unavailable, with a small retry throttle.
+   * This is safe to call whenever an MCP client asks for the current tool list.
+   */
+  async discoverAvailable(): Promise<void> {
+    const now = Date.now();
+    for (const provider of this.providers.values()) {
+      if (provider.isConnected() && this.toolSnapshots.has(provider.id)) continue;
+      const lastAttempt = this.lastDiscoveryAttempt.get(provider.id) ?? 0;
+      if (now - lastAttempt < this.discoveryRetryMs) continue;
+      this.lastDiscoveryAttempt.set(provider.id, now);
+      try {
+        await provider.connect();
+        await this.refresh(provider.id);
+        console.log(`[MCP Provider] '${provider.id}' discovered (${this.toolSnapshots.get(provider.id)?.length ?? 0} tools)`);
+      } catch (error) {
+        console.warn(`[MCP Provider] '${provider.id}' discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
   async closeAll(): Promise<void> {
     await Promise.all([...this.providers.values()].map((provider) => provider.close()));
   }

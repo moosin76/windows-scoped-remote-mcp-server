@@ -12,14 +12,14 @@ import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
 import { registerProviderStatusTool, registerProviderTools } from "./providers/provider-tools.js";
 
-export function createMcpServer(
+export async function createMcpServer(
   config: AppConfig,
   processManager: ProcessManager,
   fileService: FileService,
   workspaceManager?: WorkspaceManager,
   browserManager?: BrowserManager,
   providerRegistry?: ProviderRegistry,
-): McpServer {
+): Promise<McpServer> {
   const server = new McpServer(
     {
       name: "windows-scoped-remote-mcp",
@@ -41,6 +41,7 @@ export function createMcpServer(
   registerExecTools(server, config, processManager, fileService);
   registerFileTools(server, config, fileService);
   if (providerRegistry) {
+    await providerRegistry.discoverAvailable();
     registerProviderStatusTool(server, providerRegistry);
     registerProviderTools(server, providerRegistry, providerRegistry.listCachedTools());
   }
