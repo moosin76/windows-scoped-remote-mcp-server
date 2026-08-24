@@ -53,13 +53,30 @@ ChatGPT, Claude 등 최신 LLM 클라이언트와 연동하여, 대화만으로 
 
 ---
 
-## 🛠️ 제공 도구 목록 (22 Tools)
+## 🛠️ 제공 도구 목록 (총 30 Tools)
 
+### 🌐 1. 브라우저 자동화 & 웹 테스트 도구 (Playwright 8 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
+| **`browser_navigate`** | 웹사이트 주소(URL)로 브라우저 이동 및 페이지 로드 |
+| **`browser_screenshot`** | 현재 웹 화면 스크린샷 캡처 및 작업 폴더에 이미지 파일(PNG) 저장 |
+| **`browser_click`** | 버튼, 링크 등 특정 HTML 요소를 마우스 클릭 |
+| **`browser_fill`** | 검색창, 입력 폼에 텍스트 자동 타이핑 및 입력 |
+| **`browser_get_content`** | 웹페이지 본문 텍스트 또는 HTML 소스 추출 |
+| **`browser_evaluate`** | 브라우저 콘솔에서 자바스크립트(JS) 코드 실행 및 결과 수집 |
+| **`browser_press_key`** | 키보드 키(Enter, Tab, Escape, 화살표 등) 입력 |
+| **`browser_close`** | 브라우저 세션 종료 및 메모리 해제 |
+
+### 📂 2. 다중 워크스페이스 관리 도구 (3 Tools)
 | 도구명 (Tool) | 설명 |
 | :--- | :--- |
 | **`list_workspaces`** | 등록된 모든 다중 워크스페이스 목록, 별칭(Alias), 활성화 상태 조회 |
 | **`get_active_workspace`** | 현재 활성화된 기본 작업 공간의 이름과 절대 경로 조회 |
 | **`switch_workspace`** | 별칭(Alias) 또는 경로로 활성 작업 공간을 실시간 전환 |
+
+### 📁 3. 파일 및 코드 조작 도구 (11 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
 | **`list_directory`** | 지정한 경로의 파일 및 하위 디렉토리 목록 조회 |
 | **`read_file`** | 텍스트 파일 읽기 (오프셋 및 분할 읽기 지원) |
 | **`write_file`** | 신규 파일 생성 및 덮어쓰기/이어쓰기 |
@@ -71,6 +88,10 @@ ChatGPT, Claude 등 최신 LLM 클라이언트와 연동하여, 대화만으로 
 | **`move_file`** | 파일/폴더 이동 및 이름 변경 |
 | **`copy_file`** | 파일/폴더 복사 |
 | **`stat_path`** | 파일/폴더의 크기, 수정일, 속성 메타데이터 조회 |
+
+### ⚡ 4. 터미널 명령어 및 스크립트 실행 도구 (8 Tools)
+| 도구명 (Tool) | 설명 |
+| :--- | :--- |
 | **`search_files`** | Glob 패턴으로 파일명 검색 |
 | **`find_in_files`** | 파일 내부 텍스트 및 정규식 고속 검색 |
 | **`exec_command`** | PowerShell 또는 CMD 명령어를 실행하고 결과 반환 |
@@ -221,6 +242,12 @@ npm start
 
 # 4. 패키지 설치 및 테스트 실행
 @my-remote npm install 명령어로 필요한 라이브러리를 설치하고 npm test를 돌려 결과를 확인해줘
+
+# 5. 웹 브라우저 자동화 & 화면 캡처 (Playwright)
+@my-remote 네이버(naver.com)로 이동해서 검색창에 'Godot Engine 4' 검색하고 결과 페이지 스크린샷 찍어서 search.png로 저장해줘
+
+# 6. 내가 만든 로컬 웹페이지 실시간 검증
+@my-remote 로컬 웹서버를 실행하고 브라우저로 접속해서 [게임 시작] 버튼을 누른 다음 화면이 잘 나오는지 스크린샷으로 확인해줘
 ```
 
 ---

@@ -13,6 +13,7 @@ import { ProcessManager } from "./process-manager.js";
 import { RemoteDevOAuthProvider, OAUTH_SCOPES } from "./oauth.js";
 import { generateOpenApiSpec, generateAiPluginManifest } from "./openapi.js";
 import type { WorkspaceManager } from "./workspace.js";
+import type { BrowserManager } from "./browser-manager.js";
 
 export interface RunningHttpServer {
   httpServer: HttpServer;
@@ -32,6 +33,7 @@ export async function startHttpServer(
   processManager: ProcessManager,
   fileService: FileService,
   workspaceManager?: WorkspaceManager,
+  browserManager?: BrowserManager,
 ): Promise<RunningHttpServer> {
   const app = express();
   app.disable("x-powered-by");
@@ -248,7 +250,13 @@ export async function startHttpServer(
       enableJsonResponse: true,
     });
 
-    const mcpServer = createMcpServer(config, processManager, fileService, workspaceManager);
+    const mcpServer = createMcpServer(
+      config,
+      processManager,
+      fileService,
+      workspaceManager,
+      browserManager,
+    );
 
     const closeRequest = async () => {
       await mcpServer.close().catch(() => {});

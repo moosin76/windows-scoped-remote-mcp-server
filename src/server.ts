@@ -5,6 +5,7 @@ import { ProcessManager } from "./process-manager.js";
 import { startHttpServer } from "./http-server.js";
 import { startCloudflareTunnel } from "./tunnel.js";
 import { WorkspaceManager } from "./workspace.js";
+import { BrowserManager } from "./browser-manager.js";
 
 async function main() {
   const config = loadConfig(process.env, process.cwd());
@@ -17,6 +18,7 @@ async function main() {
   console.log("============================================================");
   console.log(`📁 Active Workspace: ${activeWs.name} (${activeWs.path})`);
   console.log(`📚 All Workspaces:   ${workspaceManager.getAllWorkspaces().map(w => `${w.name} -> ${w.path}`).join(" | ")}`);
+  console.log(`🌐 Browser Engine:   Playwright (Edge / Chrome / Chromium)`);
   console.log(`🐚 Default Shell:    ${config.defaultShell}`);
   console.log(`🔒 Sandbox Guard:    Active (${workspaceManager.getAllRoots().length} Multi-Root Workspaces Contained)`);
   console.log(`🔌 Local Endpoint:   http://localhost:${config.port}${config.endpoint}`);
@@ -32,6 +34,7 @@ async function main() {
   console.log("============================================================\n");
 
   const sandbox = new SandboxGuard(workspaceManager);
+  const browserManager = new BrowserManager(sandbox, true);
 
   const processManager = new ProcessManager({
     maxProcesses: config.maxProcesses,
@@ -47,7 +50,13 @@ async function main() {
     maxOutputBytes: config.maxOutputBytes,
   });
 
-  const runningServer = await startHttpServer(config, processManager, fileService, workspaceManager);
+  const runningServer = await startHttpServer(
+    config,
+    processManager,
+    fileService,
+    workspaceManager,
+    browserManager,
+  );
   console.log(`[HTTP Server] Listening on ${config.host}:${config.port}`);
 
   let tunnel: Awaited<ReturnType<typeof startCloudflareTunnel>> | undefined;
@@ -63,6 +72,7 @@ async function main() {
     if (tunnel) {
       tunnel.stop();
     }
+    await browserManager.close().catch(() => {});
     await runningServer.close().catch(() => {});
     process.exit(0);
   };
