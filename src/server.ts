@@ -18,7 +18,7 @@ async function main() {
   console.log("============================================================");
   console.log(`📁 Active Workspace: ${activeWs.name} (${activeWs.path})`);
   console.log(`📚 All Workspaces:   ${workspaceManager.getAllWorkspaces().map(w => `${w.name} -> ${w.path}`).join(" | ")}`);
-  console.log(`🌐 Browser Engine:   Playwright (Edge / Chrome / Chromium)`);
+  console.log(`🌐 Browser Engine:   Playwright (${config.browserHeadless ? "Headless/Background" : "Headed/Visible Window"})`);
   console.log(`🐚 Default Shell:    ${config.defaultShell}`);
   console.log(`🔒 Sandbox Guard:    Active (${workspaceManager.getAllRoots().length} Multi-Root Workspaces Contained)`);
   console.log(`🔌 Local Endpoint:   http://localhost:${config.port}${config.endpoint}`);
@@ -34,7 +34,7 @@ async function main() {
   console.log("============================================================\n");
 
   const sandbox = new SandboxGuard(workspaceManager);
-  const browserManager = new BrowserManager(sandbox, true);
+  const browserManager = new BrowserManager(sandbox, config.browserHeadless);
 
   const processManager = new ProcessManager({
     maxProcesses: config.maxProcesses,

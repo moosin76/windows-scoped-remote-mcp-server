@@ -37,6 +37,7 @@ export async function startHttpServer(
 ): Promise<RunningHttpServer> {
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
 
   // CORS and Accept headers normalizer
   app.use((req, res, next) => {

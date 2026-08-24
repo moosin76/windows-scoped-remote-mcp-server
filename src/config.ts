@@ -33,6 +33,7 @@ export interface AppConfig {
   maxProcesses: number;
   maxFileChunkBytes: number;
   maxEditFileBytes: number;
+  browserHeadless: boolean;
   cloudflareTunnelToken: string | undefined;
 }
 
@@ -162,6 +163,7 @@ export function loadConfig(
     maxProcesses: parseInteger(env.MCP_MAX_PROCESSES, 128, "MCP_MAX_PROCESSES", 1),
     maxFileChunkBytes: parseInteger(env.MCP_MAX_FILE_CHUNK_BYTES, 1024 * 1024, "MCP_MAX_FILE_CHUNK_BYTES", 4096),
     maxEditFileBytes: parseInteger(env.MCP_MAX_EDIT_FILE_BYTES, 64 * 1024 * 1024, "MCP_MAX_EDIT_FILE_BYTES", 4096),
+    browserHeadless: parseBoolean(env.MCP_BROWSER_HEADLESS, false),
     cloudflareTunnelToken,
   };
 }

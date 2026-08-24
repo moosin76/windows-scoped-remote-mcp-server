@@ -121,6 +121,7 @@ copy .env.example .env
 | **`MCP_PUBLIC_URL`** | `https://mcp.yourdomain.com` | **필수** | Cloudflare Tunnel을 통해 외부에 노출되는 공개 HTTPS 주소 |
 | **`CLOUDFLARE_TUNNEL_TOKEN`** | `your_tunnel_token` | 선택 | Cloudflare Zero Trust 대시보드에서 발급받은 고정 터널 토큰 |
 | **`MCP_DEFAULT_SHELL`** | `powershell` | 선택 | `exec_command` 실행 시 기본 쉘 (`powershell`, `cmd`, `pwsh`) |
+| **`MCP_BROWSER_HEADLESS`** | `false` | 선택 | `false` 설정 시 **내 모니터에 실제 브라우저 창을 띄움**, `true`는 백그라운드 숨김 |
 | **`MCP_MAX_FILE_CHUNK_BYTES`** | `1048576` (1MB) | 선택 | `read_file` 1회 최대 읽기 바이트 크기 |
 | **`MCP_MAX_EDIT_FILE_BYTES`** | `67108864` (64MB) | 선택 | `edit_file` / `write_file` 최대 수정 가능 파일 크기 |
 | **`MCP_MAX_OUTPUT_BYTES`** | `1048576` (1MB) | 선택 | 터미널 명령어 실행 출력 버퍼 최대 크기 |
@@ -139,8 +140,9 @@ MCP_AUTH_TOKEN=your_secure_password_here
 MCP_PUBLIC_URL=https://mcp.yourdomain.com
 CLOUDFLARE_TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
 
-# [Shell Configuration]
+# [Shell & Browser Configuration]
 MCP_DEFAULT_SHELL=powershell
+MCP_BROWSER_HEADLESS=false
 
 # [Limits - Safety Guardrails]
 MCP_MAX_FILE_CHUNK_BYTES=1048576

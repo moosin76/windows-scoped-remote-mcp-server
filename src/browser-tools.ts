@@ -15,6 +15,10 @@ export function registerBrowserTools(
         "Open or navigate the browser to a given URL. Returns page title and HTTP status code.",
       inputSchema: {
         url: z.string().url().describe("The URL to navigate to (e.g. https://example.com or http://localhost:3000)"),
+        headless: z
+          .boolean()
+          .optional()
+          .describe("Set to false to pop up a visible browser window on user's desktop, or true for background headless mode."),
         waitUntil: z
           .enum(["load", "domcontentloaded", "networkidle"])
           .default("domcontentloaded")
@@ -22,8 +26,11 @@ export function registerBrowserTools(
         timeoutMs: z.number().int().min(1000).max(60000).default(30000).describe("Navigation timeout in milliseconds"),
       },
     },
-    async ({ url, waitUntil, timeoutMs }) =>
+    async ({ url, headless, waitUntil, timeoutMs }) =>
       runTool(async () => {
+        if (headless !== undefined) {
+          await browserManager.setHeadless(headless);
+        }
         return await browserManager.navigate(url, waitUntil, timeoutMs);
       }),
   );

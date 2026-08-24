@@ -13,8 +13,11 @@ export class BrowserManager {
     this.headless = headless;
   }
 
-  setHeadless(headless: boolean): void {
-    this.headless = headless;
+  async setHeadless(headless: boolean): Promise<void> {
+    if (this.headless !== headless) {
+      this.headless = headless;
+      await this.close();
+    }
   }
 
   async getPage(): Promise<Page> {
