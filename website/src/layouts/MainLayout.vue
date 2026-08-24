@@ -2,7 +2,7 @@
   <q-layout view="hHh lpr fFf" class="site-layout">
     <q-header class="site-header">
       <q-toolbar class="site-toolbar">
-        <router-link class="brand" to="/"><span class="brand-mark">W</span><span class="brand-name">WSR</span></router-link>
+        <router-link class="brand" to="/"><img class="brand-icon" src="/wsr-logo.png" alt="WSR" /><span class="brand-name">WSR</span></router-link>
         <q-space />
         <div class="desktop-nav">
           <router-link to="/features">{{ t('nav.features') }}</router-link>
@@ -36,7 +36,7 @@ onMounted(() => applyTheme(localStorage.getItem('wsr-theme') !== 'light'))
 .site-header { background:color-mix(in srgb,var(--wsr-bg) 88%,transparent); backdrop-filter:blur(18px); border-bottom:1px solid var(--wsr-line); transition:background .25s ease,border-color .25s ease; }
 .site-toolbar { height:76px; width:min(1160px,calc(100% - 48px)); margin:auto; padding:0; }
 .brand { display:flex;align-items:center;gap:10px;color:var(--wsr-text);text-decoration:none;font-weight:800;letter-spacing:.16em; }
-.brand-mark { display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--wsr-line);border-radius:8px;background:var(--wsr-surface);color:var(--wsr-accent);font-size:13px; }
+.brand-icon { display:block;width:32px;height:32px;object-fit:contain;border-radius:8px; }
 .desktop-nav { display:flex;gap:30px;margin-right:14px; }
 .desktop-nav a { color:var(--wsr-muted);text-decoration:none;font-size:13px;transition:color .2s; }
 .desktop-nav a:hover { color:var(--wsr-text); }
