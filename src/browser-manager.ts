@@ -3,42 +3,56 @@ import path from "node:path";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import type { SandboxGuard } from "./sandbox.js";
 
+interface BrowserRuntimeState {
+  context: BrowserContext | null;
+  page: Page | null;
+  headless: boolean;
+  userDataDir: string;
+}
+
 export class BrowserManager {
-  private context: BrowserContext | null = null;
-  private page: Page | null = null;
-  private headless: boolean;
-  private userDataDir: string;
+  private readonly state: BrowserRuntimeState;
 
   constructor(
     private readonly sandbox: SandboxGuard,
     headless = false,
     userDataDir?: string,
+    sharedState?: BrowserRuntimeState,
   ) {
-    this.headless = headless;
-    this.userDataDir =
-      userDataDir || path.resolve(process.cwd(), ".browser-profile");
-    if (!existsSync(this.userDataDir)) {
+    this.state = sharedState ?? {
+      context: null,
+      page: null,
+      headless,
+      userDataDir: userDataDir || path.resolve(process.cwd(), ".browser-profile"),
+    };
+    if (!existsSync(this.state.userDataDir)) {
       try {
-        mkdirSync(this.userDataDir, { recursive: true });
+        mkdirSync(this.state.userDataDir, { recursive: true });
       } catch {}
     }
   }
 
+  /** Shares the Playwright page/login state while resolving saved files through
+   * an independent sandbox (for example an MCP session workspace fork). */
+  fork(sandbox: SandboxGuard): BrowserManager {
+    return new BrowserManager(sandbox, this.state.headless, this.state.userDataDir, this.state);
+  }
+
   async setHeadless(headless: boolean): Promise<void> {
-    if (this.headless !== headless) {
-      this.headless = headless;
+    if (this.state.headless !== headless) {
+      this.state.headless = headless;
       await this.close();
     }
   }
 
   async getPage(): Promise<Page> {
-    if (this.page && !this.page.isClosed()) {
-      return this.page;
+    if (this.state.page && !this.state.page.isClosed()) {
+      return this.state.page;
     }
 
-    if (!this.context) {
+    if (!this.state.context) {
       const launchOptions = {
-        headless: this.headless,
+        headless: this.state.headless,
         viewport: { width: 1280, height: 720 },
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -52,34 +66,34 @@ export class BrowserManager {
 
       try {
         // 1. Try Microsoft Edge preinstalled on Windows (preserves Edge/Chrome sessions)
-        this.context = await chromium.launchPersistentContext(this.userDataDir, {
+        this.state.context = await chromium.launchPersistentContext(this.state.userDataDir, {
           ...launchOptions,
           channel: "msedge",
         });
       } catch {
         try {
           // 2. Fallback to Google Chrome preinstalled
-          this.context = await chromium.launchPersistentContext(this.userDataDir, {
+          this.state.context = await chromium.launchPersistentContext(this.state.userDataDir, {
             ...launchOptions,
             channel: "chrome",
           });
         } catch {
           // 3. Fallback to bundled Chromium
-          this.context = await chromium.launchPersistentContext(this.userDataDir, {
+          this.state.context = await chromium.launchPersistentContext(this.state.userDataDir, {
             ...launchOptions,
           });
         }
       }
     }
 
-    const pages = this.context.pages();
+    const pages = this.state.context.pages();
     if (pages.length > 0 && !pages[0].isClosed()) {
-      this.page = pages[0];
+      this.state.page = pages[0];
     } else {
-      this.page = await this.context.newPage();
+      this.state.page = await this.state.context.newPage();
     }
 
-    return this.page;
+    return this.state.page;
   }
 
   async navigate(
@@ -202,13 +216,13 @@ export class BrowserManager {
   }
 
   async close() {
-    if (this.page) {
-      await this.page.close().catch(() => {});
-      this.page = null;
+    if (this.state.page) {
+      await this.state.page.close().catch(() => {});
+      this.state.page = null;
     }
-    if (this.context) {
-      await this.context.close().catch(() => {});
-      this.context = null;
+    if (this.state.context) {
+      await this.state.context.close().catch(() => {});
+      this.state.context = null;
     }
     return { status: "closed" };
   }
