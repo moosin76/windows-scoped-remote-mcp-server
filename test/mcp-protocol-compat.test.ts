@@ -156,6 +156,31 @@ describe("WSR MCP protocol compatibility", () => {
           (tool: any) => tool.name === "mcp_provider_status",
         ),
       ).toBe(true);
+      const applyPatchTool = list.result.tools.find(
+        (tool: any) => tool.name === "apply_patch",
+      );
+      expect(applyPatchTool?.outputSchema?.properties?.success).toBeDefined();
+      expect(applyPatchTool?.outputSchema?.properties?.output).toBeDefined();
+
+      const statResponse = await handler.fetch(
+        request(
+          {
+            jsonrpc: "2.0",
+            id: "stat-1",
+            method: "tools/call",
+            params: modernParams({
+              name: "stat_path",
+              arguments: { path: "package.json" },
+            }),
+          },
+          MODERN_PROTOCOL_VERSION,
+          "stat_path",
+        ),
+      );
+      expect(statResponse.status).toBe(200);
+      const statCall = await jsonRpcBody(statResponse);
+      expect(statCall.result.structuredContent.exists).toBe(true);
+      expect(statCall.result.structuredContent.relativePath).toBe("package.json");
 
       const callResponse = await handler.fetch(
         request(

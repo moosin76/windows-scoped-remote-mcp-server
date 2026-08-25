@@ -1,4 +1,4 @@
-﻿import type { McpServer, Tool } from "@modelcontextprotocol/server";
+import type { McpServer, Tool } from "@modelcontextprotocol/server";
 import { jsonSchemaObjectToZodRawShape } from "zod-from-json-schema";
 import type { ProviderRegistry, NamespacedTool } from "./provider-registry.js";
 
@@ -49,6 +49,11 @@ function registerProviderTool(
   const zodShape = jsonSchemaObjectToZodRawShape(
     inputSchema as Parameters<typeof jsonSchemaObjectToZodRawShape>[0],
   );
+  const outputShape = tool.outputSchema
+    ? jsonSchemaObjectToZodRawShape(
+        tool.outputSchema as Parameters<typeof jsonSchemaObjectToZodRawShape>[0],
+      )
+    : undefined;
 
   const registerTool = server.registerTool.bind(server) as any;
   registerTool(
@@ -56,6 +61,7 @@ function registerProviderTool(
     {
       ...(tool.description ? { description: tool.description } : {}),
       inputSchema: zodShape,
+      ...(outputShape ? { outputSchema: outputShape } : {}),
       ...(tool.annotations ? { annotations: tool.annotations } : {}),
     },
     async (args: Record<string, unknown>) => {
