@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # PostgreSQL MCP Provider 준비
-=======
-﻿# PostgreSQL MCP Provider 준비
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e
 
 ## 상태
 

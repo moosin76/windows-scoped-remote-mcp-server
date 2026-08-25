@@ -19,7 +19,7 @@ WSR이 유용했다면 GitHub Sponsors를 통해 프로젝트를 후원할 수 �
 ## 주요 특징
 
 - **Windows SandboxGuard** — 설정한 Workspace 경계 안에서 파일과 명령 실행을 제한합니다.
-- **Multi-Workspace** — 여러 프로젝트를 등록하고 활성 Workspace를 전환할 수 있습니다.
+- **Multi-Workspace** — 여러 프로젝트를 등록하고 활성 Workspace를 전환할 수 있으며, ChatGPT/MCP 세션별로 활성 Workspace 상태가 독립됩니다.
 - **파일/코드 관리** — 조회, 생성, 수정, 이동, 복사, 삭제, patch 적용 등을 지원합니다.
 - **PowerShell / CMD / 프로세스 관리** — 개발 명령 실행과 백그라운드 프로세스를 관리합니다.
 - **Playwright 브라우저 자동화** — 실제 브라우저를 열고 탐색, 입력, 클릭, 스크린샷 등을 수행합니다.
@@ -205,7 +205,9 @@ MCP_WORKSPACE_ROOT=D:\Godot\MyGame
 
 현재 활성 Workspace는 기본 작업 대상으로 사용하고, 다른 등록 Workspace는 교차 Workspace 기능을 통해 읽기/검색/분석/복사 중심으로 사용할 수 있습니다.
 
-Workspace 경계를 벗어난 파일 및 명령 접근은 SandboxGuard가 차단합니다.
+활성 Workspace 상태는 MCP 세션별로 독립됩니다. 따라서 서로 다른 ChatGPT 채팅에서 각각 `game`, `tools`처럼 다른 Workspace를 선택해도 `switch_workspace` 상태가 다른 채팅으로 전파되지 않습니다. MCP 2025-era는 `Mcp-Session-Id`, ChatGPT의 MCP 2026-07-28 연결은 `x-openai-session`을 기준으로 세션을 구분합니다.
+
+Workspace 경계를 벗어난 파일 및 명령 접근은 SandboxGuard가 차단합니다. 세부 구현은 `docs/session-scoped-workspaces.md`를 참고하세요.
 
 ---
 
@@ -351,43 +353,24 @@ WSR은 개발 자동화를 위해 강력한 기능을 제공하므로 다음 원
 
 MIT License
 
-<<<<<<< HEAD
-
 ## PostgreSQL MCP (CrystalDBA)
 
 WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재 검증된 구성은 다음과 같습니다.
-=======
-## PostgreSQL MCP (CrystalDBA)
-
-WSR? Remote MCP Provider?? transport? ??? ? ????. ?? ??? ??? ??? ????.
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e
 
 | Provider | Endpoint | Transport | Tools |
 | --- | --- | --- | ---: |
 | Godot | `http://127.0.0.1:8000/mcp` | Streamable HTTP | 45 |
 | PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
 
-<<<<<<< HEAD
 PostgreSQL Provider를 활성화하려면 루트 `.env`에 다음 값을 설정합니다.
-=======
-PostgreSQL Provider? ?????? ?? `.env`? ?? ?? ?????.
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e
 
 ```env
 MCP_POSTGRESQL_ENABLED=true
 MCP_POSTGRESQL_URL=http://127.0.0.1:10021/sse
 ```
 
-<<<<<<< HEAD
 Docker 실행 환경은 `mcp-servers/postgres-mcp/`에 있으며 실제 `DATABASE_URI`는 해당 디렉터리의 `.env`에만 둡니다. DB 비밀번호나 실제 연결 문자열은 Git에 커밋하지 않습니다.
 
 PostgreSQL MCP가 제공하는 9개 도구는 WSR namespace 적용 후 `postgresql_*` 형태로 노출됩니다. 실제 연결에서는 `list_schemas`, `list_objects`, `get_object_details`, `explain_query`, `analyze_workload_indexes`, `analyze_query_indexes`, `analyze_db_health`, `get_top_queries`, `execute_sql`을 확인했습니다.
 
 자세한 설치/운영 방법은 `docs/postgresql-mcp-provider.md`와 `mcp-servers/postgres-mcp/README.md`를 참고하세요.
-=======
-Docker ?? ??? `mcp-servers/postgres-mcp/`? ??? ?? `DATABASE_URI`? ?? ????? `.env`?? ???. DB ????? ?? ?? ???? Git? ???? ????.
-
-PostgreSQL MCP? ???? 9? ??? WSR namespace ?? ? `postgresql_*` ??? ?????. ?? ????? `list_schemas`, `list_objects`, `get_object_details`, `explain_query`, `analyze_workload_indexes`, `analyze_query_indexes`, `analyze_db_health`, `get_top_queries`, `execute_sql`? ??????.
-
-??? ??/?? ??? `docs/postgresql-mcp-provider.md`? `mcp-servers/postgres-mcp/README.md`? ?????.
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e

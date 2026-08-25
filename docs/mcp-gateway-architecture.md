@@ -157,8 +157,6 @@ Tool 정의가 변경되면 Registry snapshot을 갱신한다. `createMcpHandler
 
 MCP 세션을 장기간 유지하면서 즉시 `tools/list_changed` notification을 전달해야 하는 경우에는 향후 세션 관리 구조와 함께 별도로 구현한다.
 
-<<<<<<< HEAD
-
 ## Provider별 outbound transport
 
 WSR의 inbound MCP 서버는 SDK v2 split packages를 사용하지만, Remote Provider의 outbound transport는 Provider 특성에 따라 다르게 선택할 수 있다.
@@ -176,22 +174,15 @@ RemoteMcpProvider
 현재 `@modelcontextprotocol/client 2.0.0`에는 legacy `SSEClientTransport`가 노출되지 않으므로 SSE Provider 호환성은 `@modelcontextprotocol/sdk 1.30.0`을 병행 사용한다. 이 호환 계층은 outbound Provider 연결에만 사용하며 WSR inbound의 MCP 2026-07-28 지원을 되돌리지 않는다.
 
 검증된 Provider 구성은 Godot 45 tools + PostgreSQL 9 tools = 총 54 remote tools이다. Provider 상태는 `mcp_provider_status`로 확인한다.
-=======
-## Provider? outbound transport
 
-WSR? inbound MCP ??? SDK v2 split packages? ?????, Remote Provider? outbound transport? Provider ??? ?? ??? ??? ? ??.
+## MCP 세션별 Workspace 상태
 
-```text
-RemoteMcpProvider
-?? streamable-http
-?  ?? @modelcontextprotocol/client 2.x
-?     ?? Godot MCP /mcp
-?? sse
-   ?? @modelcontextprotocol/sdk 1.x compatibility client
-      ?? CrystalDBA postgres-mcp /sse
-```
+Workspace 목록과 Sandbox root는 Gateway 설정으로 공유하지만, `active workspace`는 MCP 세션별 상태로 관리한다.
 
-?? `@modelcontextprotocol/client 2.0.0`?? legacy `SSEClientTransport`? ???? ???? SSE Provider ???? `@modelcontextprotocol/sdk 1.30.0`? ?? ????. ? ?? ??? outbound Provider ???? ???? WSR inbound? MCP 2026-07-28 ??? ???? ???.
+- MCP 2025-era: `Mcp-Session-Id`별 `WorkspaceManager` fork
+- MCP 2026-07-28 ChatGPT: `x-openai-session`별 `WorkspaceManager` fork
+- `x-openai-session`이 없는 modern client: 기존 stateless 동작 유지
 
-??? Provider ??? Godot 45 tools + PostgreSQL 9 tools = ? 54 remote tools??. Provider ??? `mcp_provider_status`? ????.
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e
+따라서 서로 다른 ChatGPT 채팅에서 각각 다른 Workspace를 선택해도 `switch_workspace` 상태가 다른 채팅으로 전파되지 않는다. File/Exec 도구와 브라우저 결과물 저장 경로도 호출 세션의 활성 Workspace를 기준으로 한다.
+
+세부 설계와 검증 절차는 `docs/session-scoped-workspaces.md`를 참고한다.

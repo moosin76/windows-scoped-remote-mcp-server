@@ -196,8 +196,6 @@ Provider tool 호출이 실패할 경우 Gateway를 종료하지 말고 사용�
 
 현재 WSR은 요청마다 MCP Server를 구성하므로 Scheduler가 갱신한 Registry snapshot은 다음 `tools/list` 요청에 반영된다. 장기 세션과 `tools/list_changed` notification은 별도의 세션 관리 작업으로 다룬다.
 
-<<<<<<< HEAD
-
 ## PostgreSQL MCP 운영 규칙
 
 - PostgreSQL Provider는 CrystalDBA `postgres-mcp`를 사용하며 현재 transport는 legacy SSE이다.
@@ -208,6 +206,16 @@ Provider tool 호출이 실패할 경우 Gateway를 종료하지 말고 사용�
 - Provider 추가/수정 후에는 `npm run typecheck`, `npm test`, `git diff --check`를 수행한다.
 - 실제 연결 검증 시 `mcp_provider_status`에서 Provider별 connected/toolCount를 확인하고, PostgreSQL은 최소 `list_schemas`와 `list_objects`를 호출한다.
 
+## MCP 세션별 Workspace 규칙
+
+- Workspace 목록과 Sandbox root는 공유하지만 `active workspace`는 MCP 세션별로 독립되어야 한다.
+- legacy MCP에서는 `Mcp-Session-Id`, ChatGPT의 MCP `2026-07-28` modern 요청에서는 `x-openai-session`을 세션 구분에 사용한다.
+- `x-openai-subject`는 사용자 단위일 수 있으므로 Workspace 세션 key로 사용하지 않는다.
+- `x-openai-session`, Authorization, Cookie 등 세션/인증 원문 값을 로그나 문서에 기록하지 않는다.
+- `switch_workspace` 변경이 다른 ChatGPT 채팅으로 전파되는지 반드시 두 개 이상의 세션으로 회귀 테스트한다.
+- File/Exec 및 Workspace에 저장하는 Browser 도구는 호출 세션의 활성 Workspace를 따라야 한다.
+- 세부 설계는 `docs/session-scoped-workspaces.md`를 기준으로 한다.
+
 ## 문서 인코딩 규칙
 
 - 모든 프로젝트 문서는 **UTF-8**로 저장한다.
@@ -215,14 +223,3 @@ Provider tool 호출이 실패할 경우 Gateway를 종료하지 말고 사용�
 - 새 문서를 만들거나 기존 문서를 수정할 때 한글이 `?`, `U+FFFD` 등으로 깨지지 않았는지 확인한다.
 - 가능하면 UTF-8 BOM 없이 저장한다. 기존 파일의 BOM은 특별한 호환성 이유가 없다면 제거한다.
 - 문서 작업 후에는 UTF-8 디코딩 검사를 수행하고, 인코딩 오류나 replacement character(`U+FFFD`)가 없는지 확인한다.
-=======
-## PostgreSQL MCP ?? ??
-
-- PostgreSQL Provider? CrystalDBA `postgres-mcp`? ???? ?? transport? legacy SSE??.
-- Godot Provider? Streamable HTTP ??? PostgreSQL ??? ???? ???. Provider? transport? ????? ????.
-- PostgreSQL ?? endpoint? `http://127.0.0.1:10021/sse`??.
-- ?? `DATABASE_URI`, DB ??, ????? `.env`?? ???? Git? ???? ???.
-- ?? DB??? `restricted`? ???? ??? ????. ??/??? DB??? ??? ?? `unrestricted`? ????.
-- Provider ??/?? ??? `npm run typecheck`, `npm test`, `git diff --check`? ????.
-- ?? ?? ?? ? `mcp_provider_status`?? Provider? connected/toolCount? ????, PostgreSQL? ?? `list_schemas`? `list_objects`? ????.
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e

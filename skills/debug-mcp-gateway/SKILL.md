@@ -117,7 +117,18 @@ WSR 전체가 종료되는지부터 확인하지 말고 다음 순서로 확인�
 
 Provider 연결 실패는 WSR Gateway 전체 장애로 취급하지 않습니다.
 
-<<<<<<< HEAD
+## ChatGPT 채팅 간 Workspace 간섭 진단
+
+한 채팅에서 `switch_workspace`를 호출한 뒤 다른 채팅의 active workspace까지 바뀐다면 MCP 세션 routing을 확인한다.
+
+1. 요청의 `mcp-protocol-version`을 확인한다.
+2. MCP 2025-era라면 `Mcp-Session-Id`가 세션별로 분리되는지 확인한다.
+3. ChatGPT MCP 2026-07-28 요청이라면 `x-openai-session` 헤더 존재 여부를 확인한다.
+4. `x-openai-session`의 실제 값, Authorization, Cookie 등 민감한 원문은 로그에 출력하지 않는다.
+5. 서로 다른 두 ChatGPT 채팅에서 각각 다른 Workspace를 선택한 뒤 `get_active_workspace`와 `exec_command`를 재호출한다.
+6. modern OpenAI session 격리 회귀 테스트는 `test/session-workspace.test.ts`를 실행한다.
+
+세부 설계는 `docs/session-scoped-workspaces.md`를 참고한다.
 
 ## SSE endpoint 405 진단
 
@@ -132,18 +143,3 @@ legacy SSE endpoint에 Streamable HTTP transport로 연결하면 `POST /sse` 요
 5. `list_schemas` 또는 `list_objects`를 실제 호출해 응답을 확인.
 
 Godot처럼 `/mcp` Streamable HTTP Provider에는 이 해결책을 적용하지 않는다.
-=======
-## SSE endpoint 405 ??
-
-legacy SSE endpoint? Streamable HTTP transport? ???? `POST /sse` ??? ????? `405 Method Not Allowed`? ??? ? ??.
-
-? ?? ?? ??? ????.
-
-1. Provider URL? ??? `/sse` endpoint?? ??.
-2. Provider ??? `transport`? `"sse"`?? ??.
-3. PostgreSQL Docker ???? `POST /sse 405`? ????? ??.
-4. `mcp_provider_status`?? PostgreSQL? connected / 9 tools?? ??.
-5. `list_schemas` ?? `list_objects`? ?? ??? ??? ??.
-
-Godot?? `/mcp` Streamable HTTP Provider?? ? ???? ???? ???.
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e

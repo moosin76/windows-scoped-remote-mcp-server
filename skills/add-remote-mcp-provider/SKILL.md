@@ -242,8 +242,6 @@ feat: add <provider> MCP integration
 - Scheduler는 비동기 백그라운드 작업이며 MCP 요청을 막아서는 안 된다.
 - 실패한 health check는 경고로 처리하고 다음 주기에 다시 시도한다.
 
-<<<<<<< HEAD
-
 ## Transport 선택 규칙
 
 Provider를 추가할 때 endpoint URL만 보고 transport를 추측하지 않는다. 서버가 Streamable HTTP인지 legacy SSE인지 먼저 확인한다.
@@ -254,18 +252,6 @@ Provider를 추가할 때 endpoint URL만 보고 transport를 추측하지 않�
 `@modelcontextprotocol/client 2.x`에는 legacy SSE transport가 없으므로 WSR은 SSE Provider에 한해 `@modelcontextprotocol/sdk 1.x` compatibility client를 사용한다. 신규 Provider가 SSE라면 이 경로를 재사용하고 Godot의 Streamable HTTP 경로를 변경하지 않는다.
 
 PostgreSQL 예:
-=======
-## Transport ?? ??
-
-Provider? ??? ? endpoint URL? ?? transport? ???? ???. ??? Streamable HTTP?? legacy SSE?? ?? ????.
-
-- Streamable HTTP: ??? `transport: "streamable-http"`, ?? Godot?? ??.
-- legacy SSE: `transport: "sse"`, ?? CrystalDBA postgres-mcp?? ??.
-
-`@modelcontextprotocol/client 2.x`?? legacy SSE transport? ???? WSR? SSE Provider? ?? `@modelcontextprotocol/sdk 1.x` compatibility client? ????. ?? Provider? SSE?? ? ??? ????? Godot? Streamable HTTP ??? ???? ???.
-
-PostgreSQL ?:
->>>>>>> bc801171f3701eb530b6adcc49612293e251de7e
 
 ```ts
 new RemoteMcpProvider({
