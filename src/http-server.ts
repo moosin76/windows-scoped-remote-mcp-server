@@ -38,6 +38,12 @@ interface LegacyMcpSession {
   workspaceManager: WorkspaceManager;
 }
 
+interface ModernMcpSession {
+  handler: McpHttpHandler;
+  handleRequest: ReturnType<typeof toNodeHandler>;
+  workspaceManager: WorkspaceManager;
+}
+
 function rpcError(response: Response, status: number, message: string): void {
   response.status(status).json({
     jsonrpc: "2.0",
@@ -86,6 +92,7 @@ export async function startHttpServer(
   app.set("trust proxy", 1);
 
   const legacySessions = new Map<string, LegacyMcpSession>();
+  const modernSessions = new Map<string, ModernMcpSession>();
 
   const createSessionServices = async () => {
     const sessionWorkspaceManager = workspaceManager?.fork();
@@ -124,6 +131,41 @@ export async function startHttpServer(
       providerRegistry,
     );
     return { server, workspaceManager: sessionWorkspaceManager };
+  };
+
+  const getModernSession = (openAiSessionId: string): ModernMcpSession | undefined => {
+    const existing = modernSessions.get(openAiSessionId);
+    if (existing) return existing;
+    if (!workspaceManager) return undefined;
+
+    const sessionWorkspaceManager = workspaceManager.fork();
+    const sessionSandbox = new SandboxGuard(sessionWorkspaceManager);
+    const sessionFileService = new FileService({
+      sandbox: sessionSandbox,
+      maxChunkBytes: config.maxFileChunkBytes,
+      maxEditFileBytes: config.maxEditFileBytes,
+      maxOutputBytes: config.maxOutputBytes,
+    });
+    const sessionBrowserManager = browserManager?.fork(sessionSandbox);
+    const handler = createWsrMcpHandler(
+      config,
+      processManager,
+      sessionFileService,
+      sessionWorkspaceManager,
+      sessionBrowserManager,
+      providerRegistry,
+    );
+    const handleRequest = toNodeHandler(handler, {
+      onerror: (error) => {
+        console.error("[MCP Adapter Error]", errorMessage(error));
+      },
+    });
+    const session = { handler, handleRequest, workspaceManager: sessionWorkspaceManager };
+    modernSessions.set(openAiSessionId, session);
+    console.log(
+      `[MCP Modern Session] Initialized workspace=${sessionWorkspaceManager.getActiveWorkspace().name}`,
+    );
+    return session;
   };
 
   // CORS and Accept headers normalizer
@@ -370,7 +412,9 @@ export async function startHttpServer(
       // server default, while each MCP session owns an independent selection.
       activeWorkspace: defaultWorkspace,
       defaultWorkspace,
-      activeMcpSessions: legacySessions.size,
+      activeMcpSessions: legacySessions.size + modernSessions.size,
+      legacyMcpSessions: legacySessions.size,
+      modernMcpSessions: modernSessions.size,
       allWorkspaces: workspaceManager?.getAllWorkspaces() || [
         { name: "default", path: config.workspaceRoot, isActive: true },
       ],
@@ -400,6 +444,10 @@ export async function startHttpServer(
         `[MCP Inbound] Method: ${rpcMethodName} ${toolName ? `(${toolName})` : ""} from ${req.ip}${sessionId ? ` session=${sessionId}` : ""}`,
       );
 
+      const openAiSessionId = req.header("x-openai-session") || undefined;
+      console.log(
+        `[MCP Diagnostic] protocol=${requestedProtocol || "unknown"} openaiSession=${openAiSessionId ? "present" : "absent"}`,
+      );
       res.once("finish", () => {
         console.log(
           `[MCP Outbound] Status: ${res.statusCode} for ${rpcMethodName}`,
@@ -448,6 +496,14 @@ export async function startHttpServer(
           return;
         }
 
+        if (openAiSessionId) {
+          const modernSession = getModernSession(openAiSessionId);
+          if (modernSession) {
+            await modernSession.handleRequest(req, res, req.body);
+            return;
+          }
+        }
+
         await handleModernMcpRequest(req, res, req.body);
       } catch (err) {
         console.error("[MCP Handler Error]", errorMessage(err));
@@ -477,6 +533,10 @@ export async function startHttpServer(
             await session.server.close().catch(() => {});
           }
           legacySessions.clear();
+          for (const session of modernSessions.values()) {
+            await session.handler.close().catch(() => {});
+          }
+          modernSessions.clear();
           await mcpHandler.close();
         },
       });

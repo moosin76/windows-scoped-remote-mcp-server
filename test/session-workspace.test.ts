@@ -137,4 +137,92 @@ describe("session-scoped workspace", () => {
       await running.close();
     }
   });
+  it("isolates active workspace between two modern OpenAI sessions", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wsr-modern-sessions-"));
+    cleanup.push(root);
+    const alpha = path.join(root, "alpha");
+    const beta = path.join(root, "beta");
+
+    const config = loadConfig(
+      {
+        MCP_ALLOW_NO_AUTH: "true",
+        MCP_OAUTH_ENABLED: "false",
+        MCP_WORKSPACE_ROOT: alpha,
+        MCP_WORKSPACE_ROOTS: `alpha:${alpha},beta:${beta}`,
+      },
+      root,
+    );
+    config.host = "127.0.0.1";
+    config.port = 0;
+
+    const workspaceManager = new WorkspaceManager(config.workspaceRoots);
+    const sandbox = new SandboxGuard(workspaceManager);
+    const fileService = new FileService({
+      sandbox,
+      maxChunkBytes: config.maxFileChunkBytes,
+      maxEditFileBytes: config.maxEditFileBytes,
+      maxOutputBytes: config.maxOutputBytes,
+    });
+    const processManager = new ProcessManager({
+      maxProcesses: config.maxProcesses,
+      maxRetainedOutputBytes: config.maxRetainedProcessOutputBytes,
+      processRetentionMs: config.processRetentionMs,
+      defaultMaxOutputBytes: config.maxOutputBytes,
+    });
+    const running = await startHttpServer(
+      config,
+      processManager,
+      fileService,
+      workspaceManager,
+      undefined,
+      new ProviderRegistry(),
+    );
+
+    const address = running.httpServer.address() as AddressInfo;
+    const endpoint = new URL(`http://127.0.0.1:${address.port}/mcp`);
+    const modernOptions = {
+      versionNegotiation: { mode: { pin: "2026-07-28" as const } },
+    };
+    const clientA = new Client({ name: "modern-a", version: "1.0.0" }, modernOptions);
+    const clientB = new Client({ name: "modern-b", version: "1.0.0" }, modernOptions);
+
+    try {
+      await clientA.connect(
+        new StreamableHTTPClientTransport(endpoint, {
+          requestInit: { headers: { "x-openai-session": "chat-a" } },
+        }),
+      );
+      await clientB.connect(
+        new StreamableHTTPClientTransport(endpoint, {
+          requestInit: { headers: { "x-openai-session": "chat-b" } },
+        }),
+      );
+      expect(clientA.getProtocolEra()).toBe("modern");
+      expect(clientB.getProtocolEra()).toBe("modern");
+
+      await clientA.callTool({ name: "switch_workspace", arguments: { name: "alpha" } });
+      await clientB.callTool({ name: "switch_workspace", arguments: { name: "beta" } });
+
+      const activeA = resultJson(await clientA.callTool({ name: "get_active_workspace", arguments: {} }));
+      const activeB = resultJson(await clientB.callTool({ name: "get_active_workspace", arguments: {} }));
+      expect(activeA.name).toBe("alpha");
+      expect(activeB.name).toBe("beta");
+
+      const execA = resultJson(await clientA.callTool({
+        name: "exec_command",
+        arguments: { cmd: "(Get-Location).Path" },
+      }));
+      const execB = resultJson(await clientB.callTool({
+        name: "exec_command",
+        arguments: { cmd: "(Get-Location).Path" },
+      }));
+      expect(execA.cwd).toBe(path.resolve(alpha));
+      expect(execB.cwd).toBe(path.resolve(beta));
+    } finally {
+      await clientA.close().catch(() => undefined);
+      await clientB.close().catch(() => undefined);
+      await running.close();
+    }
+  });
+
 });
