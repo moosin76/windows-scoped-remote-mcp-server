@@ -157,6 +157,7 @@ Tool 정의가 변경되면 Registry snapshot을 갱신한다. `createMcpHandler
 
 MCP 세션을 장기간 유지하면서 즉시 `tools/list_changed` notification을 전달해야 하는 경우에는 향후 세션 관리 구조와 함께 별도로 구현한다.
 
+<<<<<<< HEAD
 
 ## Provider별 outbound transport
 
@@ -175,3 +176,22 @@ RemoteMcpProvider
 현재 `@modelcontextprotocol/client 2.0.0`에는 legacy `SSEClientTransport`가 노출되지 않으므로 SSE Provider 호환성은 `@modelcontextprotocol/sdk 1.30.0`을 병행 사용한다. 이 호환 계층은 outbound Provider 연결에만 사용하며 WSR inbound의 MCP 2026-07-28 지원을 되돌리지 않는다.
 
 검증된 Provider 구성은 Godot 45 tools + PostgreSQL 9 tools = 총 54 remote tools이다. Provider 상태는 `mcp_provider_status`로 확인한다.
+=======
+## Provider? outbound transport
+
+WSR? inbound MCP ??? SDK v2 split packages? ?????, Remote Provider? outbound transport? Provider ??? ?? ??? ??? ? ??.
+
+```text
+RemoteMcpProvider
+?? streamable-http
+?  ?? @modelcontextprotocol/client 2.x
+?     ?? Godot MCP /mcp
+?? sse
+   ?? @modelcontextprotocol/sdk 1.x compatibility client
+      ?? CrystalDBA postgres-mcp /sse
+```
+
+?? `@modelcontextprotocol/client 2.0.0`?? legacy `SSEClientTransport`? ???? ???? SSE Provider ???? `@modelcontextprotocol/sdk 1.30.0`? ?? ????. ? ?? ??? outbound Provider ???? ???? WSR inbound? MCP 2026-07-28 ??? ???? ???.
+
+??? Provider ??? Godot 45 tools + PostgreSQL 9 tools = ? 54 remote tools??. Provider ??? `mcp_provider_status`? ????.
+>>>>>>> bc801171f3701eb530b6adcc49612293e251de7e
