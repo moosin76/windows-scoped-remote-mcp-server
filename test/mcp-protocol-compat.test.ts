@@ -156,6 +156,11 @@ describe("WSR MCP protocol compatibility", () => {
           (tool: any) => tool.name === "mcp_provider_status",
         ),
       ).toBe(true);
+      const missingOutputSchemas = list.result.tools
+        .filter((tool: any) => !tool.outputSchema)
+        .map((tool: any) => tool.name);
+      expect(missingOutputSchemas).toEqual([]);
+
       const applyPatchTool = list.result.tools.find(
         (tool: any) => tool.name === "apply_patch",
       );
@@ -200,6 +205,7 @@ describe("WSR MCP protocol compatibility", () => {
       expect(callResponse.status).toBe(200);
       const call = await jsonRpcBody(callResponse);
       expect(call.result.content[0].text).toBe("[]");
+      expect(call.result.structuredContent.providers).toEqual([]);
     } finally {
       await handler.close();
     }

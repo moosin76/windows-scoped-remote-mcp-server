@@ -1,5 +1,6 @@
 import type { McpServer, Tool } from "@modelcontextprotocol/server";
 import { jsonSchemaObjectToZodRawShape } from "zod-from-json-schema";
+import { z } from "zod";
 import type { ProviderRegistry, NamespacedTool } from "./provider-registry.js";
 
 const EMPTY_INPUT_SCHEMA = {
@@ -27,15 +28,15 @@ export function registerProviderStatusTool(
     {
       description:
         "Show the connection status of configured remote MCP providers. Use this when a provider-specific tool is unavailable.",
+      outputSchema: z.object({ providers: z.array(z.record(z.string(), z.unknown())) }),
     },
-    async () => ({
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify(registry.listStatuses(), null, 2),
-        },
-      ],
-    }),
+    async () => {
+      const providers = registry.listStatuses();
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(providers, null, 2) }],
+        structuredContent: { providers },
+      };
+    },
   );
 }
 

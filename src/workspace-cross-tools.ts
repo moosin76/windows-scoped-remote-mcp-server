@@ -7,6 +7,14 @@ import path from "node:path";
 import { runTool } from "./tool-result.js";
 import type { WorkspaceManager } from "./workspace.js";
 
+const workspaceEntryOutput = z.object({ path:z.string(), relativePath:z.string(), name:z.string(), type:z.enum(["directory","file","other"]), size:z.number(), modifiedAt:z.string() });
+const workspaceListOutput = z.object({ workspace:z.string(), workspacePath:z.string(), directory:z.string(), entries:z.array(workspaceEntryOutput), totalEntries:z.number().int(), truncated:z.boolean() });
+const workspaceReadOutput = z.object({ workspace:z.string(), path:z.string(), relativePath:z.string(), size:z.number(), content:z.string() });
+const workspaceSearchResultOutput = z.object({ path:z.string(), relativePath:z.string(), line:z.number().int(), text:z.string() });
+const workspaceSearchOutput = z.object({ workspace:z.string(), query:z.string(), results:z.array(workspaceSearchResultOutput), totalResults:z.number().int(), truncated:z.boolean() });
+const workspaceAnalyzeOutput = z.object({ workspace:z.string(), workspacePath:z.string(), analyzedPath:z.string(), counts:z.record(z.string(),z.number().int()), extensions:z.record(z.string(),z.number().int()), entriesAnalyzed:z.number().int(), truncated:z.boolean(), writeAccess:z.enum(["active-workspace","read-only"]) });
+const workspaceCopyOutput = z.object({ sourceWorkspace:z.string(), source:z.string(), destinationWorkspace:z.string(), destination:z.string(), overwrite:z.boolean(), sourceModified:z.literal(false) });
+
 export function registerCrossWorkspaceTools(
   server: McpServer,
   wm: WorkspaceManager,
@@ -24,6 +32,7 @@ export function registerCrossWorkspaceTools(
         maxEntries: z.number().int().min(1).max(5000).default(1000),
         includeHidden: z.boolean().default(false),
       }),
+      outputSchema: workspaceListOutput,
     },
     async (a) =>
       runTool(async () => {
@@ -80,6 +89,7 @@ export function registerCrossWorkspaceTools(
           .max(1024 * 1024)
           .default(1024 * 1024),
       }),
+      outputSchema: workspaceReadOutput,
     },
     async (a) =>
       runTool(async () => {
@@ -119,6 +129,7 @@ export function registerCrossWorkspaceTools(
           .max(1024 * 1024)
           .default(524288),
       }),
+      outputSchema: workspaceSearchOutput,
     },
     async (a) =>
       runTool(async () => {
@@ -187,6 +198,7 @@ export function registerCrossWorkspaceTools(
         path: z.string().default("."),
         maxEntries: z.number().int().min(1).max(5000).default(2000),
       }),
+      outputSchema: workspaceAnalyzeOutput,
     },
     async (a) =>
       runTool(async () => {
@@ -241,6 +253,7 @@ export function registerCrossWorkspaceTools(
         destinationPath: z.string(),
         overwrite: z.boolean().default(false),
       }),
+      outputSchema: workspaceCopyOutput,
     },
     async (a) =>
       runTool(async () => {
