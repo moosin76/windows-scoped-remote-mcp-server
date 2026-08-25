@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Server as HttpServer } from "node:http";
 import {
   createMcpHandler,
@@ -20,13 +22,26 @@ import { createMcpServer } from "./mcp-server.js";
 import { ProcessManager } from "./process-manager.js";
 import { RemoteDevOAuthProvider, OAUTH_SCOPES } from "./oauth.js";
 import { generateOpenApiSpec, generateAiPluginManifest } from "./openapi.js";
-import type { WorkspaceManager } from "./workspace.js";
+import { WorkspaceManager } from "./workspace.js";
+import { SandboxGuard } from "./sandbox.js";
 import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
 
 export interface RunningHttpServer {
   httpServer: HttpServer;
   close: () => Promise<void>;
+}
+
+interface LegacyMcpSession {
+  transport: StreamableHTTPServerTransport;
+  server: Awaited<ReturnType<typeof createMcpServer>>;
+  workspaceManager: WorkspaceManager;
+}
+
+interface ModernMcpSession {
+  handler: McpHttpHandler;
+  handleRequest: ReturnType<typeof toNodeHandler>;
+  workspaceManager: WorkspaceManager;
 }
 
 function rpcError(response: Response, status: number, message: string): void {
@@ -75,6 +90,83 @@ export async function startHttpServer(
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
+
+  const legacySessions = new Map<string, LegacyMcpSession>();
+  const modernSessions = new Map<string, ModernMcpSession>();
+
+  const createSessionServices = async () => {
+    const sessionWorkspaceManager = workspaceManager?.fork();
+    if (!sessionWorkspaceManager) {
+      return {
+        server: await createMcpServer(
+          config,
+          processManager,
+          fileService,
+          undefined,
+          browserManager,
+          providerRegistry,
+        ),
+        workspaceManager: undefined,
+      };
+    }
+
+    const sessionSandbox = new SandboxGuard(sessionWorkspaceManager);
+    const sessionFileService = new FileService({
+      sandbox: sessionSandbox,
+      maxChunkBytes: config.maxFileChunkBytes,
+      maxEditFileBytes: config.maxEditFileBytes,
+      maxOutputBytes: config.maxOutputBytes,
+    });
+
+    // Browser navigation remains shared so the persistent login profile and
+    // visible browser behavior do not change. File/exec/workspace tools use
+    // the session-scoped sandbox and workspace manager.
+    const sessionBrowserManager = browserManager?.fork(sessionSandbox);
+    const server = await createMcpServer(
+      config,
+      processManager,
+      sessionFileService,
+      sessionWorkspaceManager,
+      sessionBrowserManager,
+      providerRegistry,
+    );
+    return { server, workspaceManager: sessionWorkspaceManager };
+  };
+
+  const getModernSession = (openAiSessionId: string): ModernMcpSession | undefined => {
+    const existing = modernSessions.get(openAiSessionId);
+    if (existing) return existing;
+    if (!workspaceManager) return undefined;
+
+    const sessionWorkspaceManager = workspaceManager.fork();
+    const sessionSandbox = new SandboxGuard(sessionWorkspaceManager);
+    const sessionFileService = new FileService({
+      sandbox: sessionSandbox,
+      maxChunkBytes: config.maxFileChunkBytes,
+      maxEditFileBytes: config.maxEditFileBytes,
+      maxOutputBytes: config.maxOutputBytes,
+    });
+    const sessionBrowserManager = browserManager?.fork(sessionSandbox);
+    const handler = createWsrMcpHandler(
+      config,
+      processManager,
+      sessionFileService,
+      sessionWorkspaceManager,
+      sessionBrowserManager,
+      providerRegistry,
+    );
+    const handleRequest = toNodeHandler(handler, {
+      onerror: (error) => {
+        console.error("[MCP Adapter Error]", errorMessage(error));
+      },
+    });
+    const session = { handler, handleRequest, workspaceManager: sessionWorkspaceManager };
+    modernSessions.set(openAiSessionId, session);
+    console.log(
+      `[MCP Modern Session] Initialized workspace=${sessionWorkspaceManager.getActiveWorkspace().name}`,
+    );
+    return session;
+  };
 
   // CORS and Accept headers normalizer
   app.use((req, res, next) => {
@@ -300,7 +392,7 @@ export async function startHttpServer(
     browserManager,
     providerRegistry,
   );
-  const handleMcpRequest = toNodeHandler(mcpHandler, {
+  const handleModernMcpRequest = toNodeHandler(mcpHandler, {
     onerror: (error) => {
       console.error("[MCP Adapter Error]", errorMessage(error));
     },
@@ -308,14 +400,21 @@ export async function startHttpServer(
 
   // Health check endpoint
   app.get("/health", (_req, res) => {
+    const defaultWorkspace = workspaceManager?.getActiveWorkspace() || {
+      name: "default",
+      path: config.workspaceRoot,
+    };
     res.json({
       status: "ok",
       name: "windows-scoped-remote-mcp",
       version: "1.0.0",
-      activeWorkspace: workspaceManager?.getActiveWorkspace() || {
-        name: "default",
-        path: config.workspaceRoot,
-      },
+      // Keep the old field for health endpoint compatibility. This is now the
+      // server default, while each MCP session owns an independent selection.
+      activeWorkspace: defaultWorkspace,
+      defaultWorkspace,
+      activeMcpSessions: legacySessions.size + modernSessions.size,
+      legacyMcpSessions: legacySessions.size,
+      modernMcpSessions: modernSessions.size,
       allWorkspaces: workspaceManager?.getAllWorkspaces() || [
         { name: "default", path: config.workspaceRoot, isActive: true },
       ],
@@ -325,7 +424,10 @@ export async function startHttpServer(
     });
   });
 
-  // MCP Streamable HTTP endpoint (POST /mcp)
+  // MCP Streamable HTTP endpoint (POST /mcp).
+  // 2025-era clients use a stateful transport so each MCP connection owns an
+  // independent WorkspaceManager fork. Modern protocol traffic keeps using
+  // the v2 handler.
   app.post(
     config.endpoint,
     parseJson,
@@ -333,10 +435,19 @@ export async function startHttpServer(
     async (req: Request, res: Response) => {
       const rpcMethodName = req.body?.method || "unknown";
       const toolName = req.body?.params?.name || "";
+      const sessionId = req.header("mcp-session-id") || undefined;
+      const requestedProtocol =
+        req.header("mcp-protocol-version") || req.body?.params?.protocolVersion || "";
+      const isLegacyProtocol = !requestedProtocol.startsWith("2026-");
+
       console.log(
-        `[MCP Inbound] Method: ${rpcMethodName} ${toolName ? `(${toolName})` : ""} from ${req.ip}`,
+        `[MCP Inbound] Method: ${rpcMethodName} ${toolName ? `(${toolName})` : ""} from ${req.ip}${sessionId ? ` session=${sessionId}` : ""}`,
       );
 
+      const openAiSessionId = req.header("x-openai-session") || undefined;
+      console.log(
+        `[MCP Diagnostic] protocol=${requestedProtocol || "unknown"} openaiSession=${openAiSessionId ? "present" : "absent"}`,
+      );
       res.once("finish", () => {
         console.log(
           `[MCP Outbound] Status: ${res.statusCode} for ${rpcMethodName}`,
@@ -344,7 +455,56 @@ export async function startHttpServer(
       });
 
       try {
-        await handleMcpRequest(req, res, req.body);
+        if (isLegacyProtocol) {
+          let session = sessionId ? legacySessions.get(sessionId) : undefined;
+
+          if (!session && !sessionId && isInitializeRequest(req.body)) {
+            const services = await createSessionServices();
+            let transport!: StreamableHTTPServerTransport;
+            transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: () => randomUUID(),
+              onsessioninitialized: (newSessionId) => {
+                if (!services.workspaceManager) return;
+                legacySessions.set(newSessionId, {
+                  transport,
+                  server: services.server,
+                  workspaceManager: services.workspaceManager,
+                });
+                console.log(
+                  `[MCP Session] Initialized ${newSessionId} workspace=${services.workspaceManager.getActiveWorkspace().name}`,
+                );
+              },
+            });
+            transport.onclose = () => {
+              const sid = transport.sessionId;
+              if (sid) {
+                legacySessions.delete(sid);
+                console.log(`[MCP Session] Closed ${sid}`);
+              }
+            };
+            await services.server.connect(transport);
+            await transport.handleRequest(req, res, req.body);
+            return;
+          }
+
+          if (!session) {
+            rpcError(res, 400, "Bad Request: No valid MCP session ID provided");
+            return;
+          }
+
+          await session.transport.handleRequest(req, res, req.body);
+          return;
+        }
+
+        if (openAiSessionId) {
+          const modernSession = getModernSession(openAiSessionId);
+          if (modernSession) {
+            await modernSession.handleRequest(req, res, req.body);
+            return;
+          }
+        }
+
+        await handleModernMcpRequest(req, res, req.body);
       } catch (err) {
         console.error("[MCP Handler Error]", errorMessage(err));
         if (!res.headersSent) {
@@ -368,6 +528,15 @@ export async function startHttpServer(
           await new Promise<void>((res, rej) => {
             httpServer.close((err) => (err ? rej(err) : res()));
           });
+          for (const session of legacySessions.values()) {
+            await session.transport.close().catch(() => {});
+            await session.server.close().catch(() => {});
+          }
+          legacySessions.clear();
+          for (const session of modernSessions.values()) {
+            await session.handler.close().catch(() => {});
+          }
+          modernSessions.clear();
           await mcpHandler.close();
         },
       });

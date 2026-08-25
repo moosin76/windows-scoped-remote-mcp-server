@@ -117,6 +117,23 @@ export class WorkspaceManager {
     this.activeName = workspaces[0].name.toLowerCase();
   }
 
+  /**
+   * Creates an independent workspace selection context backed by the same
+   * registered roots. Switching the fork never changes this manager.
+   */
+  fork(): WorkspaceManager {
+    const workspaces: ParsedWorkspace[] = [];
+    for (const [lower, wsPath] of this.workspaces.entries()) {
+      workspaces.push({
+        name: this.displayNames.get(lower) || lower,
+        path: wsPath,
+      });
+    }
+    const forked = new WorkspaceManager(workspaces);
+    forked.activeName = this.activeName;
+    return forked;
+  }
+
   getAllWorkspaces(): WorkspaceItem[] {
     const result: WorkspaceItem[] = [];
     for (const [lower, wsPath] of this.workspaces.entries()) {
