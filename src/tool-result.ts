@@ -4,9 +4,13 @@ import { errorMessage } from "./errors.js";
 export function formatResult(value: unknown): CallToolResult {
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  return {
+  const result: CallToolResult = {
     content: [{ type: "text", text }],
   };
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    result.structuredContent = value as Record<string, unknown>;
+  }
+  return result;
 }
 
 export function formatError(error: unknown): CallToolResult {

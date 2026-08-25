@@ -435,13 +435,14 @@ export async function startHttpServer(
     async (req: Request, res: Response) => {
       const rpcMethodName = req.body?.method || "unknown";
       const toolName = req.body?.params?.name || "";
+      const displayName = toolName || rpcMethodName;
       const sessionId = req.header("mcp-session-id") || undefined;
       const requestedProtocol =
         req.header("mcp-protocol-version") || req.body?.params?.protocolVersion || "";
       const isLegacyProtocol = !requestedProtocol.startsWith("2026-");
 
       console.log(
-        `[MCP Inbound] Method: ${rpcMethodName} ${toolName ? `(${toolName})` : ""} from ${req.ip}${sessionId ? ` session=${sessionId}` : ""}`,
+        `[MCP Inbound] ${displayName} from ${req.ip}${sessionId ? ` session=${sessionId}` : ""}`,
       );
 
       const openAiSessionId = req.header("x-openai-session") || undefined;
@@ -449,9 +450,7 @@ export async function startHttpServer(
         `[MCP Diagnostic] protocol=${requestedProtocol || "unknown"} openaiSession=${openAiSessionId ? "present" : "absent"}`,
       );
       res.once("finish", () => {
-        console.log(
-          `[MCP Outbound] Status: ${res.statusCode} for ${rpcMethodName}`,
-        );
+        console.log(`[MCP Outbound] ${res.statusCode} ${displayName}`);
       });
 
       try {

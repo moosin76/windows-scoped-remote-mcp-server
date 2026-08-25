@@ -3,6 +3,32 @@ import { z } from "zod";
 import { runTool } from "./tool-result.js";
 import type { WorkspaceManager } from "./workspace.js";
 
+const workspaceItemOutput = z.object({
+  name: z.string(),
+  path: z.string(),
+  isActive: z.boolean(),
+});
+
+const listWorkspacesOutput = z.object({
+  activeWorkspace: z.string(),
+  activePath: z.string(),
+  totalWorkspaces: z.number().int(),
+  workspaces: z.array(workspaceItemOutput),
+});
+
+const activeWorkspaceOutput = z.object({
+  name: z.string(),
+  path: z.string(),
+  status: z.literal("active"),
+  sandbox: z.literal("contained"),
+});
+
+const switchWorkspaceOutput = z.object({
+  switchedTo: z.string(),
+  activePath: z.string(),
+  message: z.string(),
+});
+
 export function registerWorkspaceTools(
   server: McpServer,
   workspaceManager: WorkspaceManager,
@@ -14,6 +40,7 @@ export function registerWorkspaceTools(
       description:
         "List all registered multi-root workspaces, their aliases, directory paths, and which workspace is currently active.",
       inputSchema: z.object({}),
+      outputSchema: listWorkspacesOutput,
     },
     async () =>
       runTool(async () => {
@@ -35,6 +62,7 @@ export function registerWorkspaceTools(
       description:
         "Get information about the currently active workspace, including alias name, absolute directory path, and sandbox status.",
       inputSchema: z.object({}),
+      outputSchema: activeWorkspaceOutput,
     },
     async () =>
       runTool(async () => {
@@ -62,6 +90,7 @@ export function registerWorkspaceTools(
             "Workspace alias name (e.g. 'test', 'ether', 'server') or absolute directory path to switch to.",
           ),
       }),
+      outputSchema: switchWorkspaceOutput,
     },
     async ({ name }) =>
       runTool(async () => {

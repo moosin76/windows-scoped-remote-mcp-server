@@ -41,6 +41,12 @@ describe("registerProviderTools", () => {
         required: ["message"],
         additionalProperties: false,
       },
+      outputSchema: {
+        type: "object",
+        properties: { echoed: { type: "string" } },
+        required: ["echoed"],
+        additionalProperties: false,
+      },
     };
     const { provider, callTool } = fakeProvider(tool);
     const registry = new ProviderRegistry();
@@ -68,6 +74,11 @@ describe("registerProviderTools", () => {
     expect(
       (registered[0].config.inputSchema as { message?: { _zod?: unknown } })
         .message?._zod,
+    ).toBeTruthy();
+    expect(registered[0].config.outputSchema).toBeTruthy();
+    expect(
+      (registered[0].config.outputSchema as { echoed?: { _zod?: unknown } })
+        .echoed?._zod,
     ).toBeTruthy();
 
     await registered[0].callback({ message: "hello" });

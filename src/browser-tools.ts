@@ -3,6 +3,17 @@ import { z } from "zod";
 import type { BrowserManager } from "./browser-manager.js";
 import { runTool } from "./tool-result.js";
 
+const navigateOutput = z.object({ url: z.string(), title: z.string(), status: z.number().int(), loginSessionPersisted: z.boolean() });
+const screenshotOutput = z.object({ savedToFile: z.string().optional(), base64: z.string().optional(), mimeType: z.string().optional(), sizeBytes: z.number().int(), url: z.string() });
+const savedImageOutput = z.object({ savedToFile: z.string(), sizeBytes: z.number().int(), selector: z.string(), url: z.string() });
+const downloadOutput = z.object({ savedToFile: z.string(), suggestedFilename: z.string(), url: z.string() });
+const clickOutput = z.object({ clicked: z.string(), currentUrl: z.string() });
+const fillOutput = z.object({ filled: z.string(), valueLength: z.number().int() });
+const contentOutput = z.object({ selector: z.string().optional(), type: z.enum(["text","html"]), content: z.string(), title: z.string().optional(), url: z.string().optional() });
+const evaluateOutput = z.object({ result: z.unknown() });
+const keyOutput = z.object({ pressed: z.string() });
+const closeOutput = z.object({ status: z.literal("closed") });
+
 export function registerBrowserTools(
   server: McpServer,
   browserManager: BrowserManager,
@@ -38,6 +49,7 @@ export function registerBrowserTools(
           .default(30000)
           .describe("Navigation timeout in milliseconds"),
       }),
+      outputSchema: navigateOutput,
     },
     async ({ url, headless, waitUntil, timeoutMs }) =>
       runTool(async () => {
@@ -66,6 +78,7 @@ export function registerBrowserTools(
           .default(false)
           .describe("Whether to capture the entire scrollable page"),
       }),
+      outputSchema: screenshotOutput,
     },
     async ({ filePath, fullPage }) =>
       runTool(async () => {
@@ -93,6 +106,7 @@ export function registerBrowserTools(
             "Relative PNG file path inside the workspace (e.g. 'playwrite/meta-ai-generated.png')",
           ),
       }),
+      outputSchema: savedImageOutput,
     },
     async ({ selector, filePath }) =>
       runTool(async () => {
@@ -125,6 +139,7 @@ export function registerBrowserTools(
           .default(30000)
           .describe("Download timeout in milliseconds"),
       }),
+      outputSchema: downloadOutput,
     },
     async ({ selector, filePath, timeoutMs }) =>
       runTool(async () => {
@@ -153,6 +168,7 @@ export function registerBrowserTools(
           .default(10000)
           .describe("Click timeout in ms"),
       }),
+      outputSchema: clickOutput,
     },
     async ({ selector, timeoutMs }) =>
       runTool(async () => {
@@ -182,6 +198,7 @@ export function registerBrowserTools(
           .default(10000)
           .describe("Timeout in ms"),
       }),
+      outputSchema: fillOutput,
     },
     async ({ selector, value, timeoutMs }) =>
       runTool(async () => {
@@ -209,6 +226,7 @@ export function registerBrowserTools(
             "Format of content: 'text' (cleaned readable text) or 'html' (raw DOM HTML)",
           ),
       }),
+      outputSchema: contentOutput,
     },
     async ({ selector, type }) =>
       runTool(async () => {
@@ -230,6 +248,7 @@ export function registerBrowserTools(
             "JavaScript code to evaluate (e.g. 'document.title', 'window.innerWidth', 'Array.from(document.querySelectorAll(\"a\")).map(a => a.href)')",
           ),
       }),
+      outputSchema: evaluateOutput,
     },
     async ({ script }) =>
       runTool(async () => {
@@ -251,6 +270,7 @@ export function registerBrowserTools(
             "Key name (e.g. 'Enter', 'Escape', 'Tab', 'Backspace', 'ArrowDown')",
           ),
       }),
+      outputSchema: keyOutput,
     },
     async ({ key }) =>
       runTool(async () => {
@@ -265,6 +285,7 @@ export function registerBrowserTools(
       description:
         "Close the currently running browser and page session to release memory.",
       inputSchema: z.object({}),
+      outputSchema: closeOutput,
     },
     async () =>
       runTool(async () => {

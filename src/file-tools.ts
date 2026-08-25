@@ -5,6 +5,81 @@ import type { AppConfig } from "./config.js";
 import { FileService } from "./file-service.js";
 import { runTool } from "./tool-result.js";
 
+const directoryEntryOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+  name: z.string(),
+  type: z.enum(["file", "directory", "symlink", "other"]),
+  size: z.number().optional(),
+  mode: z.string().optional(),
+  modifiedAt: z.string().optional(),
+});
+
+const listDirectoryOutput = z.object({
+  directory: z.string(),
+  relativePath: z.string(),
+  entries: z.array(directoryEntryOutput),
+  totalEntries: z.number().int(),
+  truncated: z.boolean(),
+});
+
+const statPathOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+  exists: z.boolean(),
+  type: z.enum(["file", "directory", "symlink", "other"]).optional(),
+  size: z.number().optional(),
+  mode: z.string().optional(),
+  modifiedAt: z.string().optional(),
+  symlinkTarget: z.string().optional(),
+});
+
+const readFileOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+  size: z.number().int(),
+  offset: z.number().int(),
+  bytesRead: z.number().int(),
+  hasMore: z.boolean(),
+  nextOffset: z.number().int().optional(),
+  encoding: z.enum(["utf8", "base64"]),
+  content: z.string(),
+});
+
+const writeFileOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+  bytesWritten: z.number().int(),
+});
+
+const replaceFileOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+  replacementsMade: z.number().int(),
+});
+
+const applyPatchOutput = z.object({
+  success: z.boolean(),
+  output: z.string(),
+});
+
+const hashFileOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+  algorithm: z.string(),
+  hash: z.string(),
+});
+
+const pathOutput = z.object({
+  path: z.string(),
+  relativePath: z.string(),
+});
+
+const moveCopyOutput = z.object({
+  from: z.string(),
+  to: z.string(),
+});
+
 export function registerFileTools(
   server: McpServer,
   config: AppConfig,
@@ -29,6 +104,7 @@ export function registerFileTools(
         includeHidden: z.boolean().default(false),
         includeMetadata: z.boolean().default(true),
       }),
+      outputSchema: listDirectoryOutput,
     },
     async ({
       path,
@@ -58,6 +134,7 @@ export function registerFileTools(
       inputSchema: z.object({
         path: z.string().describe("Target file or directory path."),
       }),
+      outputSchema: statPathOutput,
     },
     async ({ path }) =>
       runTool(async () => {
@@ -87,6 +164,7 @@ export function registerFileTools(
           .default(config.maxFileChunkBytes),
         encoding: z.enum(["utf8", "base64"]).default("utf8"),
       }),
+      outputSchema: readFileOutput,
     },
     async ({ path, offset, maxBytes, encoding }) =>
       runTool(async () => {
@@ -109,6 +187,7 @@ export function registerFileTools(
           .default("overwrite"),
         createDirectories: z.boolean().default(true),
       }),
+      outputSchema: writeFileOutput,
     },
     async ({ path, content, encoding, mode, createDirectories }) =>
       runTool(async () => {
@@ -134,6 +213,7 @@ export function registerFileTools(
           .default(false)
           .describe("Replace all occurrences."),
       }),
+      outputSchema: replaceFileOutput,
     },
     async ({ path, targetString, replacementString, allowMultiple }) =>
       runTool(async () => {
@@ -156,6 +236,7 @@ export function registerFileTools(
         patch: z.string().min(1).describe("Diff/patch content."),
         workdir: z.string().optional().describe("Directory to apply patch in."),
       }),
+      outputSchema: applyPatchOutput,
     },
     async ({ patch, workdir }) =>
       runTool(async () => {
@@ -174,6 +255,7 @@ export function registerFileTools(
         dataBase64: z.string().describe("Base64 encoded chunk data."),
         mode: z.enum(["overwrite", "append"]).default("overwrite"),
       }),
+      outputSchema: writeFileOutput,
     },
     async ({ path, dataBase64, mode }) =>
       runTool(async () => {
@@ -195,6 +277,7 @@ export function registerFileTools(
         offset: z.number().int().min(0).default(0),
         maxBytes: z.number().int().default(config.maxFileChunkBytes),
       }),
+      outputSchema: readFileOutput,
     },
     async ({ path, offset, maxBytes }) =>
       runTool(async () => {
@@ -216,6 +299,7 @@ export function registerFileTools(
         path: z.string().describe("File path."),
         algorithm: z.enum(["sha256", "md5", "sha1"]).default("sha256"),
       }),
+      outputSchema: hashFileOutput,
     },
     async ({ path, algorithm }) =>
       runTool(async () => {
@@ -232,6 +316,7 @@ export function registerFileTools(
       inputSchema: z.object({
         path: z.string().describe("Directory path to create."),
       }),
+      outputSchema: pathOutput,
     },
     async ({ path }) =>
       runTool(async () => {
@@ -249,6 +334,7 @@ export function registerFileTools(
         destination: z.string().describe("Destination path."),
         overwrite: z.boolean().default(false),
       }),
+      outputSchema: moveCopyOutput,
     },
     async ({ source, destination, overwrite }) =>
       runTool(async () => {
@@ -265,6 +351,7 @@ export function registerFileTools(
         source: z.string().describe("Source path."),
         destination: z.string().describe("Destination path."),
       }),
+      outputSchema: moveCopyOutput,
     },
     async ({ source, destination }) =>
       runTool(async () => {
@@ -285,6 +372,7 @@ export function registerFileTools(
           .default(false)
           .describe("Required for directories."),
       }),
+      outputSchema: pathOutput,
     },
     async ({ path, recursive }) =>
       runTool(async () => {

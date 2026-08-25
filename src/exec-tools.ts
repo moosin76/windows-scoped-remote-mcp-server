@@ -7,6 +7,47 @@ import { ProcessManager } from "./process-manager.js";
 import { runScript, type ScriptInterpreter } from "./script-runner.js";
 import { runTool } from "./tool-result.js";
 
+const processReadOutput = z.object({
+  sessionId: z.string(),
+  command: z.string(),
+  cwd: z.string(),
+  running: z.boolean(),
+  pid: z.number().int().optional(),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  wallTimeMs: z.number(),
+  exitCode: z.number().int().nullable().optional(),
+  signal: z.string().nullable().optional(),
+  timedOut: z.boolean(),
+  error: z.string().optional(),
+  stdout: z.string(),
+  stderr: z.string(),
+  output: z.string(),
+  nextSeq: z.number().int(),
+  hasMore: z.boolean(),
+  totalOutputBytes: z.number().int(),
+  droppedOutputBytes: z.number().int(),
+  completed: z.boolean(),
+});
+
+const processActionOutput = z.object({
+  success: z.boolean(),
+  sessionId: z.string(),
+});
+
+const processListItemOutput = z.object({
+  sessionId: z.string(),
+  command: z.string(),
+  running: z.boolean(),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  exitCode: z.number().int().nullable().optional(),
+});
+
+const processListOutput = z.object({
+  processes: z.array(processListItemOutput),
+});
+
 export function registerExecTools(
   server: McpServer,
   config: AppConfig,
@@ -63,6 +104,7 @@ export function registerExecTools(
           .max(config.maxOutputBytes)
           .default(config.maxOutputBytes),
       }),
+      outputSchema: processReadOutput,
     },
     async ({
       cmd,
@@ -147,6 +189,7 @@ export function registerExecTools(
         yieldTimeMs: z.number().int().min(0).max(30_000).default(10_000),
         maxOutputBytes: z.number().int().default(config.maxOutputBytes),
       }),
+      outputSchema: processReadOutput,
     },
     async ({
       script,
@@ -201,6 +244,7 @@ export function registerExecTools(
         waitMs: z.number().int().min(0).max(30_000).default(5_000),
         maxOutputBytes: z.number().int().default(config.maxOutputBytes),
       }),
+      outputSchema: processReadOutput,
     },
     async ({ sessionId, afterSeq, waitMs, maxOutputBytes }) =>
       runTool(async () => {
@@ -229,6 +273,7 @@ export function registerExecTools(
           .default(false)
           .describe("Close stdin stream after writing."),
       }),
+      outputSchema: processActionOutput,
     },
     async ({ sessionId, input, end }) =>
       runTool(async () => {
@@ -247,6 +292,7 @@ export function registerExecTools(
         sessionId: z.string().uuid(),
         signal: z.enum(["SIGINT", "SIGTERM", "SIGKILL"]).default("SIGTERM"),
       }),
+      outputSchema: processActionOutput,
     },
     async ({ sessionId, signal }) =>
       runTool(async () => {
@@ -262,6 +308,7 @@ export function registerExecTools(
       description:
         "List currently managed running or recently completed process sessions.",
       inputSchema: z.object({}),
+      outputSchema: processListOutput,
     },
     async () =>
       runTool(async () => {
