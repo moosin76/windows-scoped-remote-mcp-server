@@ -157,6 +157,9 @@ describe("WSR MCP protocol compatibility", () => {
           (tool: any) => tool.name === "mcp_provider_status",
         ),
       ).toBe(true);
+      expect(
+        list.result.tools.some((tool: any) => tool.name === "wsr_status"),
+      ).toBe(true);
       const missingOutputSchemas = list.result.tools
         .filter((tool: any) => !tool.outputSchema)
         .map((tool: any) => tool.name);

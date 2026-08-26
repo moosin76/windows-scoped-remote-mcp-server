@@ -78,10 +78,10 @@ export async function startCloudflareTunnel(
       publicUrl = match[0];
       console.log(`\n============================================================`);
       console.log(` [Cloudflare Quick Tunnel Connected!]`);
-      console.log(` ?뙋 Public URL:    ${publicUrl}`);
-      console.log(` ?뵆 MCP Endpoint:  ${publicUrl}${config.endpoint}`);
+      console.log(` 🌐 Public URL:    ${publicUrl}`);
+      console.log(` 🔌 MCP Endpoint:  ${publicUrl}${config.endpoint}`);
       if (config.authToken) {
-        console.log(` ?뵎 Auth Header:   Authorization: Bearer ${config.authToken}`);
+        console.log(` 🔐 Authentication: Bearer token configured`);
       }
       console.log(`============================================================\n`);
     }
@@ -89,15 +89,15 @@ export async function startCloudflareTunnel(
     // Named tunnel connection success detection
     if (!fixedTunnelAnnounced && (text.includes("Registered tunnel connection") || text.includes("Connection registered"))) {
       console.log(`\n============================================================`);
-      console.log(` [Cloudflare Fixed Tunnel Connected & Active!] ??`);
+      console.log(` [Cloudflare Fixed Tunnel Connected & Active!]`);
       if (config.publicUrl) {
-        console.log(` ?뙋 Public URL:    ${config.publicUrl}`);
-        console.log(` ?뵆 MCP Endpoint:  ${config.publicUrl}${config.endpoint}`);
+        console.log(` 🌐 Public URL:    ${config.publicUrl}`);
+        console.log(` 🔌 MCP Endpoint:  ${config.publicUrl}${config.endpoint}`);
       }
       if (config.authToken) {
-        console.log(` ?뵎 Auth Header:   Authorization: Bearer ${config.authToken}`);
+        console.log(` 🔐 Authentication: Bearer token configured`);
       }
-      console.log(`============================================================\\n`);
+      console.log(`============================================================\n`);
       fixedTunnelAnnounced = true;
     }
   };
