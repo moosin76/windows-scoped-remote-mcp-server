@@ -26,6 +26,9 @@ WSR이 유용했다면 GitHub Sponsors를 통해 프로젝트를 후원할 수 �
 - **Remote MCP Provider** — Godot, Blender 등 원하는 MCP를 Gateway에 추가할 수 있습니다.
 - **Provider 장애 격리** — 하나의 MCP가 꺼져 있어도 WSR Core와 다른 Provider는 계속 사용할 수 있습니다.
 - **Provider Scheduler** — MCP의 연결 상태와 `tools/list`를 주기적으로 확인하고 자동 재연결 및 Tool Registry 갱신을 수행합니다.
+- **Provider Tool 변경 알림** — Remote MCP의 Tool 목록이 바뀌면 지원하는 modern MCP 클라이언트에 `tools/list_changed` 알림을 전달합니다.
+- **Project Handoff / Resume** — `workspace_context`와 `workspace_resume`으로 Git, AGENTS, Roadmap, Session 문서를 기반으로 다른 AI/세션에서 작업 상태를 이어받을 수 있습니다.
+- **WSR 운영 진단** — `wsr_status` 하나로 WSR, Workspace, Provider, Browser, cloudflared 및 인증 설정 상태를 비밀값 없이 확인할 수 있습니다.
 - **OAuth 2.1 / Cloudflare Tunnel 지원** — 원격 MCP 클라이언트와 안전하게 연결할 수 있는 구성을 제공합니다.
 - **MCP 2026-07-28 + legacy 호환** — `server/discover` 기반 최신 stateless 요청과 2025 `initialize` 흐름을 같은 `/mcp` endpoint에서 지원합니다.
 
@@ -190,7 +193,59 @@ godot_* Tool Registry 갱신
 
 Remote MCP의 Tool 정의가 변경되면 `tools/list` 결과를 비교하여 Registry snapshot도 갱신합니다.
 
-현재 HTTP 계층은 MCP 요청마다 Server를 구성하는 구조이므로 다음 `tools/list` 요청에 최신 Tool Registry가 반영됩니다. 장기 세션에서 클라이언트 UI까지 즉시 알림을 보내는 `tools/list_changed` notification은 향후 세션 관리 구조와 함께 확장할 수 있습니다.
+Remote MCP의 Tool 정의가 바뀌면 Registry snapshot을 갱신한 뒤, 지원하는 modern MCP 클라이언트에는 표준 `tools/list_changed` 알림을 fan-out합니다. 알림을 지원하지 않는 legacy 클라이언트도 다음 `tools/list` 요청에서 최신 Registry를 받습니다. Provider의 실행/종료나 Tool 목록 변경 때문에 WSR 자체를 다시 시작할 필요는 없습니다.
+
+---
+
+## 프로젝트 작업 인계와 재개
+
+WSR은 Codex, ChatGPT/WSR 등 서로 다른 AI 작업 환경 사이에서 **대화 기록이 아니라 저장소 자체를 공통 기준**으로 사용합니다.
+
+공통 기준은 Git 상태, `AGENTS.md`, Roadmap, TODO, Session/Handoff 문서입니다.
+
+`workspace_context`는 등록된 Workspace를 전환하지 않고 다음 정보를 read-only로 수집합니다.
+
+- 현재 Git branch / HEAD / dirty 상태 / 최근 commit
+- `AGENTS.md` 또는 `AGENT.md`
+- Roadmap
+- 최근 Session/Handoff 문서
+- TODO 문서
+
+`workspace_resume`는 이 정보를 다시 해석해 작업 재개에 필요한 힌트를 구조화합니다.
+
+```text
+workspace_context(workspace="ec")
+workspace_resume(workspace="ec")
+
+→ branch/session 불일치 경고
+→ dirty 변경 영역 요약
+→ Roadmap의 다음 작업
+→ 최신 handoff 기준 resume summary
+```
+
+두 Tool 모두 대상 Workspace를 전환하거나 수정하지 않습니다. 따라서 ChatGPT에서 다른 프로젝트의 상태를 확인하면서 현재 활성 Workspace를 그대로 유지할 수 있습니다.
+
+자세한 동작은 `docs/workspace-context.md`와 `docs/workspace-resume.md`를 참고하세요.
+
+---
+
+## WSR 운영 상태 진단
+
+`wsr_status`는 여러 개의 진단 Tool을 따로 호출하지 않고 WSR의 핵심 운영 상태를 한 번에 확인하는 read-only Tool입니다.
+
+주요 정보:
+
+- WSR version / Git commit / uptime / Node version
+- active Workspace와 등록 Workspace 수
+- Provider 연결 상태와 Tool 개수
+- Browser manager 초기화/페이지 상태
+- cloudflared 설치 및 버전
+- public endpoint, OAuth, static auth, Tunnel token의 **설정 여부**
+- 운영상 주의가 필요한 warning
+
+응답에는 실제 token/password/cookie/session 값이나 Provider raw error를 포함하지 않습니다. WSR 시작 로그와 Tunnel 연결 로그 역시 Bearer token 원문을 출력하지 않습니다.
+
+자세한 내용은 `docs/wsr-status.md`를 참고하세요.
 
 ---
 
@@ -302,6 +357,10 @@ MCP SDK는 v2 split package 구조를 사용합니다.
 
 - `AGENTS.md` — 프로젝트 작업 규칙
 - `docs/mcp-gateway-architecture.md` — Gateway / Provider 구조
+- `docs/workspace-context.md` — Workspace 작업 상태 수집
+- `docs/workspace-resume.md` — 작업 재개 힌트
+- `docs/provider-tool-change-notifications.md` — Provider Tool 변경 알림
+- `docs/wsr-status.md` — WSR 운영 진단
 - `skills/add-remote-mcp-provider/SKILL.md` — MCP 추가 절차
 - `skills/test-mcp-provider/SKILL.md` — Provider 테스트
 - `skills/debug-mcp-gateway/SKILL.md` — MCP 문제 해결
@@ -345,7 +404,7 @@ WSR은 개발 자동화를 위해 강력한 기능을 제공하므로 다음 원
 
 - Workspace 외부 접근을 SandboxGuard로 제한합니다.
 - 다른 Workspace를 수정하지 않도록 교차 Workspace 권한을 분리합니다.
-- 인증 토큰과 Cloudflare Tunnel 토큰을 소스 코드에 저장하지 않습니다.
+- 인증 토큰과 Cloudflare Tunnel 토큰을 소스 코드에 저장하지 않으며, 운영 로그에도 Bearer token 원문을 출력하지 않습니다.
 - 보안 기능을 절대적인 안전 보장으로 표현하지 않고 설정된 경계와 권한 모델을 기준으로 설명합니다.
 - 원격 MCP Provider 하나의 장애가 전체 Gateway 장애로 이어지지 않도록 격리합니다.
 
