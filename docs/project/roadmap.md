@@ -40,7 +40,7 @@ Codex나 ChatGPT/WSR에서 저장소만 읽고 현재 작업 상태, 다음 작�
 
 ## NOW-02 — `workspace_context` 마무리
 
-**상태: 구현/검증 완료, 체크포인트 정리 필요**
+**상태: 완료**
 
 현재 브랜치: `feature/workspace-context`
 
@@ -54,7 +54,7 @@ Codex나 ChatGPT/WSR에서 저장소만 읽고 현재 작업 상태, 다음 작�
 - [x] 전체 typecheck/test/build
 - [x] `start.bat` cloudflared 버전 표시 및 공식 update 확인
 - [x] WSR 자체 handoff 문서와 통합 검증
-- [ ] 변경사항 최종 diff 검토 및 checkpoint commit
+- [x] 변경사항 최종 diff 검토 및 checkpoint commit
 
 ### 완료 조건
 
@@ -64,7 +64,7 @@ Codex나 ChatGPT/WSR에서 저장소만 읽고 현재 작업 상태, 다음 작�
 
 ## NOW-03 — `workspace_resume`
 
-**상태: 구현 대기**
+**상태: 완료**
 
 `workspace_context`의 원문 수집 결과를 기반으로 실제 작업 재개에 필요한 구조화된 힌트를 제공한다.
 
