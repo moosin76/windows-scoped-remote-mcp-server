@@ -85,7 +85,7 @@ AI가 모든 문서 원문을 다시 해석하지 않아도 현재 작업의 충
 
 ## NOW-04 — Provider Tool 변경 자동 알림
 
-**상태: 구현 대기**
+**상태: 완료**
 
 현재 `ProviderScheduler`는 Provider의 `tools/list` 변경을 감지해 Registry snapshot을 갱신한다. 다음 단계는 MCP 클라이언트가 변경 사실을 알 수 있도록 modern MCP의 tool 변경 알림 흐름을 연결하는 것이다.
 

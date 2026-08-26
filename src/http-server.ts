@@ -29,6 +29,7 @@ import type { ProviderRegistry } from "./providers/provider-registry.js";
 
 export interface RunningHttpServer {
   httpServer: HttpServer;
+  notifyToolsChanged: () => number;
   close: () => Promise<void>;
 }
 
@@ -42,6 +43,19 @@ interface ModernMcpSession {
   handler: McpHttpHandler;
   handleRequest: ReturnType<typeof toNodeHandler>;
   workspaceManager: WorkspaceManager;
+}
+
+type ToolListChangedHandler = Pick<McpHttpHandler, "notify">;
+
+export function notifyModernToolListChanged(
+  handlers: Iterable<ToolListChangedHandler>,
+): number {
+  let notified = 0;
+  for (const handler of handlers) {
+    handler.notify.toolsChanged();
+    notified += 1;
+  }
+  return notified;
 }
 
 function rpcError(response: Response, status: number, message: string): void {
@@ -523,6 +537,11 @@ export async function startHttpServer(
     const httpServer = app.listen(config.port, config.host, () => {
       resolve({
         httpServer,
+        notifyToolsChanged: () =>
+          notifyModernToolListChanged([
+            mcpHandler,
+            ...Array.from(modernSessions.values(), (session) => session.handler),
+          ]),
         close: async () => {
           await new Promise<void>((res, rej) => {
             httpServer.close((err) => (err ? rej(err) : res()));

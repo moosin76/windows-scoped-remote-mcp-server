@@ -134,6 +134,7 @@ describe("WSR MCP protocol compatibility", () => {
         MODERN_PROTOCOL_VERSION,
       );
       expect(discover.result.capabilities.tools).toBeDefined();
+      expect(discover.result.capabilities.tools.listChanged).toBe(true);
       expect(
         discover.result._meta["io.modelcontextprotocol/serverInfo"].name,
       ).toBe("windows-scoped-remote-mcp");

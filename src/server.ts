@@ -79,20 +79,6 @@ async function main() {
     }
   }
 
-  // Keep optional remote providers healthy and discoverable without restarting WSR.
-  const providerScheduler = new ProviderScheduler(providerRegistry, {
-    intervalMs: config.mcpProviderHealthIntervalMs,
-    retryIntervalMs: config.mcpProviderRetryIntervalMs,
-    onToolsChanged: (providerId) => {
-      const count = providerRegistry
-        .listCachedTools()
-        .filter((tool) => tool.providerId === providerId).length;
-      console.log(
-        `[MCP Provider Scheduler] '${providerId}' tool registry refreshed (${count} tools)`,
-      );
-    },
-  });
-  providerScheduler.start();
   const fileService = new FileService({
     sandbox,
     maxChunkBytes: config.maxFileChunkBytes,
@@ -109,6 +95,25 @@ async function main() {
     providerRegistry,
   );
   console.log(`[HTTP Server] Listening on ${config.host}:${config.port}`);
+
+  // Keep optional remote providers healthy and discoverable without restarting WSR.
+  // Modern 2026-07-28 clients can subscribe to tool-list changes through
+  // subscriptions/listen. Each live modern handler owns a subscription bus, so
+  // the HTTP server fans the notification out when the Provider snapshot changes.
+  const providerScheduler = new ProviderScheduler(providerRegistry, {
+    intervalMs: config.mcpProviderHealthIntervalMs,
+    retryIntervalMs: config.mcpProviderRetryIntervalMs,
+    onToolsChanged: (providerId) => {
+      const count = providerRegistry
+        .listCachedTools()
+        .filter((tool) => tool.providerId === providerId).length;
+      const notifiedHandlers = runningServer.notifyToolsChanged();
+      console.log(
+        `[MCP Provider Scheduler] '${providerId}' tool registry refreshed (${count} tools, ${notifiedHandlers} modern handler(s) notified)`,
+      );
+    },
+  });
+  providerScheduler.start();
 
   let tunnel: Awaited<ReturnType<typeof startCloudflareTunnel>> | undefined;
   try {
