@@ -40,9 +40,11 @@ async function main() {
   }
   console.log(`❤️  Health Check:    http://localhost:${config.port}/health`);
   if (config.authToken) {
-    console.log(`🔑 Bearer Token:     ${config.authToken}`);
+    console.log(`🔐 Authentication:   Bearer token configured`);
+  } else if (config.allowNoAuth) {
+    console.log(`⚠️  Authentication:   Anonymous mode enabled`);
   } else {
-    console.log(`⚠️  Bearer Token:     None (Anonymous Mode)`);
+    console.log(`🔐 Authentication:   OAuth/approval flow`);
   }
   console.log("============================================================\n");
 

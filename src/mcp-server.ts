@@ -8,6 +8,7 @@ import { registerWorkspaceTools } from "./workspace-tools.js";
 import { registerCrossWorkspaceTools } from "./workspace-cross-tools.js";
 import { registerWorkspaceContextTools } from "./workspace-context-tools.js";
 import { registerWorkspaceResumeTools } from "./workspace-resume-tools.js";
+import { registerWsrStatusTool } from "./wsr-status-tools.js";
 import { registerBrowserTools } from "./browser-tools.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
@@ -45,6 +46,14 @@ export async function createMcpServer(
     registerWorkspaceResumeTools(server, workspaceManager);
   }
   if (browserManager) registerBrowserTools(server, browserManager);
+  registerWsrStatusTool(
+    server,
+    config,
+    processManager,
+    workspaceManager,
+    browserManager,
+    providerRegistry,
+  );
   registerExecTools(server, config, processManager, fileService);
   registerFileTools(server, config, fileService);
   if (providerRegistry) {

@@ -38,6 +38,24 @@ export class BrowserManager {
     return new BrowserManager(sandbox, this.state.headless, this.state.userDataDir, this.state);
   }
 
+  getStatus(): {
+    headless: boolean;
+    initialized: boolean;
+    pageOpen: boolean;
+    pageCount: number;
+  } {
+    const pageOpen = Boolean(this.state.page && !this.state.page.isClosed());
+    const pageCount = this.state.context
+      ? this.state.context.pages().filter((page) => !page.isClosed()).length
+      : 0;
+    return {
+      headless: this.state.headless,
+      initialized: Boolean(this.state.context),
+      pageOpen,
+      pageCount,
+    };
+  }
+
   async setHeadless(headless: boolean): Promise<void> {
     if (this.state.headless !== headless) {
       this.state.headless = headless;
