@@ -1,5 +1,21 @@
 # WSR Core 1차 완성 구현 계획
 
+**상태: 완료 (2026-08-26)**
+
+## 완료 결과
+
+- Project Handoff 기반과 `AGENTS.md` 표준화 완료
+- `workspace_context` 완료 및 main 반영
+- `workspace_resume` 완료 및 main 반영
+- Provider Tool 변경 자동 알림 완료 및 main 반영
+- `wsr_status` 운영 진단 완료 및 main 반영
+- 전체 회귀 기준: 14 test files / 41 tests 통과
+- typecheck/build/diff/UTF-8 검사 통과
+- 시작/Tunnel 로그의 Bearer token 원문 노출 제거
+- 최신 코드 활성화를 위한 WSR 재시작 및 MCP 도구 새로고침만 남음
+
+이 문서의 아래 내용은 Core 1차 구현 당시의 계획/설계 근거로 보존한다. 이후 우선순위는 `docs/project/roadmap.md`의 LATER 항목을 기준으로 한다.
+
 ## 목적
 
 현재 WSR은 Workspace/File/Exec/Browser, session-scoped workspace, Remote MCP Provider, OAuth/Cloudflare Tunnel 등 핵심 기반이 이미 동작한다.
