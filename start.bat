@@ -44,7 +44,22 @@ if not exist "bin\cloudflared.exe" (
     )
 )
 
-:: 4. Run Server using tsx dev mode
+:: 4. Show installed cloudflared version and check for updates
+if exist "bin\cloudflared.exe" (
+    echo [*] Installed cloudflared version:
+    "bin\cloudflared.exe" version
+    echo [*] Checking for cloudflared updates...
+    "bin\cloudflared.exe" update
+    if errorlevel 1 (
+        echo [!] cloudflared update check failed. Continuing with the installed version.
+    ) else (
+        echo [OK] cloudflared update check completed.
+    )
+    echo [*] cloudflared version to use:
+    "bin\cloudflared.exe" version
+)
+
+:: 5. Run Server using tsx dev mode
 echo [*] Starting MCP Server...
 call npx tsx src/server.ts
 

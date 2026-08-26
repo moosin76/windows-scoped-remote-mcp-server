@@ -220,7 +220,7 @@ Provider가 꺼진 상태에서도 Core WSR 기능이 유지되는지 확인한�
 
 - `README.md`
 - `docs/mcp-gateway-architecture.md`
-- 필요한 경우 `AGENT.md`
+- 필요한 경우 `AGENTS.md`
 
 ## 12. Git checkpoint
 
