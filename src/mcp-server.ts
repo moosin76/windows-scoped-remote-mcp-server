@@ -6,6 +6,7 @@ import { registerExecTools } from "./exec-tools.js";
 import { registerFileTools } from "./file-tools.js";
 import { registerWorkspaceTools } from "./workspace-tools.js";
 import { registerCrossWorkspaceTools } from "./workspace-cross-tools.js";
+import { registerWorkspaceContextTools } from "./workspace-context-tools.js";
 import { registerBrowserTools } from "./browser-tools.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
@@ -39,6 +40,7 @@ export async function createMcpServer(
   if (workspaceManager) {
     registerWorkspaceTools(server, workspaceManager);
     registerCrossWorkspaceTools(server, workspaceManager);
+    registerWorkspaceContextTools(server, workspaceManager);
   }
   if (browserManager) registerBrowserTools(server, browserManager);
   registerExecTools(server, config, processManager, fileService);

@@ -97,7 +97,7 @@ WSR
 
 ```text
 이 windows-scoped-remote-mcp-server 프로젝트에 Blender MCP를 추가해줘.
-AGENT.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
+AGENTS.md와 skills/add-remote-mcp-provider/SKILL.md를 먼저 읽고
 기존 RemoteMcpProvider / ProviderRegistry 구조를 따라 작업해줘.
 Blender MCP의 연결 방법과 필요한 설정을 확인하고
 blender_* namespace를 사용해줘.
@@ -257,6 +257,8 @@ Windows에서는 `start.bat`를 사용하는 방법도 지원합니다.
 start.bat
 ```
 
+`start.bat`는 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
+
 ---
 
 ## 주요 환경변수
@@ -298,7 +300,7 @@ MCP SDK는 v2 split package 구조를 사용합니다.
 
 새 MCP Provider를 추가할 때는 다음 문서를 먼저 읽는 것을 권장합니다.
 
-- `AGENT.md` — 프로젝트 작업 규칙
+- `AGENTS.md` — 프로젝트 작업 규칙
 - `docs/mcp-gateway-architecture.md` — Gateway / Provider 구조
 - `skills/add-remote-mcp-provider/SKILL.md` — MCP 추가 절차
 - `skills/test-mcp-provider/SKILL.md` — Provider 테스트
