@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ProcessManager } from "./process-manager.js";
+import { createPowerShellScriptContents } from "./powershell-utf8.js";
 
 export type ScriptInterpreter = "powershell" | "cmd" | "bash" | "sh" | "node" | "python" | "custom";
 
@@ -62,7 +63,11 @@ export async function runScript(
   const scriptDir = path.join(tempBaseDir, ".mcp_tmp_scripts");
   await mkdir(scriptDir, { recursive: true });
   const scriptFile = path.join(scriptDir, `script_${randomUUID()}${extension}`);
-  await writeFile(scriptFile, options.script, "utf8");
+  const scriptContents =
+    interpreter === "powershell"
+      ? createPowerShellScriptContents(options.script)
+      : options.script;
+  await writeFile(scriptFile, scriptContents, "utf8");
 
   const cleanup = async () => {
     try {

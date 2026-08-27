@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { AppConfig } from "./config.js";
 import { FileService } from "./file-service.js";
+import { wrapPowerShellCommand } from "./powershell-utf8.js";
 import { ProcessManager } from "./process-manager.js";
 import { runScript, type ScriptInterpreter } from "./script-runner.js";
 import { runTool } from "./tool-result.js";
@@ -125,7 +126,13 @@ export function registerExecTools(
 
         if (selectedShell === "powershell") {
           executable = "powershell.exe";
-          args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd];
+          args = [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            wrapPowerShellCommand(cmd),
+          ];
         } else if (selectedShell === "cmd") {
           executable = "cmd.exe";
           args = ["/c", cmd];

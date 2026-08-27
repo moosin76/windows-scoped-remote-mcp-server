@@ -19,6 +19,7 @@ import type { AppConfig } from "./config.js";
 import { errorMessage } from "./errors.js";
 import { FileService } from "./file-service.js";
 import { createMcpServer } from "./mcp-server.js";
+import { wrapPowerShellCommand } from "./powershell-utf8.js";
 import { ProcessManager } from "./process-manager.js";
 import { RemoteDevOAuthProvider, OAUTH_SCOPES } from "./oauth.js";
 import { generateOpenApiSpec, generateAiPluginManifest } from "./openapi.js";
@@ -356,7 +357,13 @@ export async function startHttpServer(
         let args: string[] = [];
         if (selectedShell === "powershell") {
           executable = "powershell.exe";
-          args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd];
+          args = [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            wrapPowerShellCommand(cmd),
+          ];
         } else if (selectedShell === "cmd") {
           executable = "cmd.exe";
           args = ["/c", cmd];
