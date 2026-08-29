@@ -2,9 +2,20 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ProcessManager } from "./process-manager.js";
-import { createPowerShellScriptContents } from "./powershell-utf8.js";
+import {
+  createPowerShellScriptContents,
+  createPwshScriptContents,
+} from "./powershell-utf8.js";
 
-export type ScriptInterpreter = "powershell" | "cmd" | "bash" | "sh" | "node" | "python" | "custom";
+export type ScriptInterpreter =
+  | "powershell"
+  | "pwsh"
+  | "cmd"
+  | "bash"
+  | "sh"
+  | "node"
+  | "python"
+  | "custom";
 
 export interface RunScriptOptions {
   script: string;
@@ -25,7 +36,7 @@ export async function runScript(
   options: RunScriptOptions,
 ): Promise<string> {
   const isWin = process.platform === "win32";
-  const interpreter = options.interpreter || (isWin ? "powershell" : "bash");
+  const interpreter = options.interpreter || (isWin ? "pwsh" : "bash");
 
   let extension = ".sh";
   let executable = "bash";
@@ -33,11 +44,15 @@ export async function runScript(
 
   if (interpreter === "powershell") {
     extension = ".ps1";
-    executable = "powershell.exe";
+    executable = isWin ? "powershell.exe" : "powershell";
     runnerArgs = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"];
+  } else if (interpreter === "pwsh") {
+    extension = ".ps1";
+    executable = "pwsh";
+    runnerArgs = ["-NoProfile", "-File"];
   } else if (interpreter === "cmd") {
     extension = ".bat";
-    executable = "cmd.exe";
+    executable = isWin ? "cmd.exe" : "cmd";
     runnerArgs = ["/c"];
   } else if (interpreter === "node") {
     extension = ".js";
@@ -66,7 +81,9 @@ export async function runScript(
   const scriptContents =
     interpreter === "powershell"
       ? createPowerShellScriptContents(options.script)
-      : options.script;
+      : interpreter === "pwsh"
+        ? createPwshScriptContents(options.script)
+        : options.script;
   await writeFile(scriptFile, scriptContents, "utf8");
 
   const cleanup = async () => {

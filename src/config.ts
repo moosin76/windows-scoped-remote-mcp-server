@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { normalizeCanonicalPath } from "./paths.js";
 import { parseWorkspaceRoots, type ParsedWorkspace } from "./workspace.js";
+import { detectDefaultShell } from "./shells.js";
 
 dotenv.config();
 
@@ -112,11 +113,9 @@ export function loadConfig(
   const endpoint = normalizeEndpoint(env.MCP_ENDPOINT);
   const publicUrl = env.MCP_PUBLIC_URL?.trim().replace(/\/+$/, "") || undefined;
 
-  // Shell default: on Windows powershell, on POSIX bash
-  let defaultShell = env.MCP_DEFAULT_SHELL?.trim() || env.SHELL?.trim();
-  if (!defaultShell) {
-    defaultShell = process.platform === "win32" ? "powershell" : "/bin/bash";
-  }
+  // Shell selection is automatic. Windows prefers Git Bash and falls back to PowerShell 7.
+  // server.ts installs PowerShell 7 with winget when neither shell is available.
+  const defaultShell = detectDefaultShell();
 
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
   const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
@@ -166,7 +165,7 @@ export function loadConfig(
     defaultCwd,
     defaultShell,
     maxRequestBody: env.MCP_MAX_REQUEST_BODY?.trim() || "16mb",
-    maxOutputBytes: parseInteger(env.MCP_MAX_OUTPUT_BYTES, 1024 * 1024, "MCP_MAX_OUTPUT_BYTES", 16 * 1024),
+    maxOutputBytes: parseInteger(env.MCP_MAX_OUTPUT_BYTES, 4 * 1024 * 1024, "MCP_MAX_OUTPUT_BYTES", 16 * 1024),
     maxRetainedProcessOutputBytes: parseInteger(
       env.MCP_MAX_RETAINED_PROCESS_OUTPUT_BYTES,
       4 * 1024 * 1024,
@@ -175,8 +174,8 @@ export function loadConfig(
     ),
     processRetentionMs: parseInteger(env.MCP_PROCESS_RETENTION_MS, 60 * 60 * 1000, "MCP_PROCESS_RETENTION_MS", 1000),
     maxProcesses: parseInteger(env.MCP_MAX_PROCESSES, 128, "MCP_MAX_PROCESSES", 1),
-    maxFileChunkBytes: parseInteger(env.MCP_MAX_FILE_CHUNK_BYTES, 1024 * 1024, "MCP_MAX_FILE_CHUNK_BYTES", 4096),
-    maxEditFileBytes: parseInteger(env.MCP_MAX_EDIT_FILE_BYTES, 64 * 1024 * 1024, "MCP_MAX_EDIT_FILE_BYTES", 4096),
+    maxFileChunkBytes: parseInteger(env.MCP_MAX_FILE_CHUNK_BYTES, 4 * 1024 * 1024, "MCP_MAX_FILE_CHUNK_BYTES", 4096),
+    maxEditFileBytes: parseInteger(env.MCP_MAX_EDIT_FILE_BYTES, 128 * 1024 * 1024, "MCP_MAX_EDIT_FILE_BYTES", 4096),
     browserHeadless: parseBoolean(env.MCP_BROWSER_HEADLESS, false),
     browserUserDataDir: path.resolve(
       env.MCP_BROWSER_USER_DATA_DIR?.trim() || path.join(processCwd, ".browser-profile"),

@@ -18,3 +18,8 @@ export function createPowerShellScriptContents(script: string): string {
   // non-ASCII source text is decoded correctly before the UTF-8 preamble runs.
   return `${UTF8_BOM}${POWERSHELL_UTF8_PREAMBLE}\r\n${script}`;
 }
+
+export function createPwshScriptContents(script: string): string {
+  // PowerShell 7 reads UTF-8 without BOM natively; keep temporary scripts BOM-free.
+  return `${POWERSHELL_UTF8_PREAMBLE}\r\n${script}`;
+}

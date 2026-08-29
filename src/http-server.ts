@@ -19,7 +19,7 @@ import type { AppConfig } from "./config.js";
 import { errorMessage } from "./errors.js";
 import { FileService } from "./file-service.js";
 import { createMcpServer } from "./mcp-server.js";
-import { wrapPowerShellCommand } from "./powershell-utf8.js";
+import { createShellInvocation } from "./shells.js";
 import { ProcessManager } from "./process-manager.js";
 import { RemoteDevOAuthProvider, OAUTH_SCOPES } from "./oauth.js";
 import { generateOpenApiSpec, generateAiPluginManifest } from "./openapi.js";
@@ -351,25 +351,8 @@ export async function startHttpServer(
           res.status(400).json({ error: "Missing required 'cmd'" });
           return;
         }
-        const isWin = process.platform === "win32";
-        const selectedShell = shell || (isWin ? "powershell" : "bash");
-        let executable = selectedShell;
-        let args: string[] = [];
-        if (selectedShell === "powershell") {
-          executable = "powershell.exe";
-          args = [
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            wrapPowerShellCommand(cmd),
-          ];
-        } else if (selectedShell === "cmd") {
-          executable = "cmd.exe";
-          args = ["/c", cmd];
-        } else {
-          args = ["-c", cmd];
-        }
+        const selectedShell = shell || config.defaultShell;
+        const { executable, args } = createShellInvocation(selectedShell, cmd);
 
         const resolvedCwd = fileService.resolve(cwd || ".");
         const sessionId = await processManager.start({

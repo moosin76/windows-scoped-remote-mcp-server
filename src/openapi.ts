@@ -173,7 +173,7 @@ export function generateOpenApiSpec(config: AppConfig) {
         post: {
           operationId: "execCommand",
           summary: "Execute Windows shell command",
-          description: "Run PowerShell or CMD commands in workspace and return output.",
+          description: "Run PowerShell 7/5.1, CMD, or Bash commands in workspace and return output.",
           requestBody: {
             required: true,
             content: {
@@ -182,7 +182,7 @@ export function generateOpenApiSpec(config: AppConfig) {
                   type: "object",
                   properties: {
                     cmd: { type: "string", description: "Command to execute (e.g. dir, git status, npm test)" },
-                    shell: { type: "string", enum: ["powershell", "cmd"], default: "powershell" },
+                    shell: { type: "string", enum: ["pwsh", "powershell", "cmd", "bash", "sh"], default: config.defaultShell },
                     cwd: { type: "string", default: "." },
                     timeoutMs: { type: "integer", default: 30000 },
                   },
@@ -240,7 +240,7 @@ export function generateAiPluginManifest(config: AppConfig) {
     name_for_human: "my-remote",
     name_for_model: "my_remote",
     description_for_human: "Windows Scoped Remote Developer Assistant with file and command tools.",
-    description_for_model: "Remote tool for browsing files, reading/writing files, and running PowerShell commands within the sandboxed Windows workspace.",
+    description_for_model: "Remote tool for browsing files, reading/writing files, and running PowerShell 7, Windows PowerShell, CMD, or Bash commands within the sandboxed Windows workspace.",
     auth: {
       type: "none",
     },

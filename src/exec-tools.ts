@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { AppConfig } from "./config.js";
 import { FileService } from "./file-service.js";
-import { wrapPowerShellCommand } from "./powershell-utf8.js";
+import { createShellInvocation } from "./shells.js";
 import { ProcessManager } from "./process-manager.js";
 import { runScript, type ScriptInterpreter } from "./script-runner.js";
 import { runTool } from "./tool-result.js";
@@ -56,13 +56,19 @@ export function registerExecTools(
   fileService: FileService,
 ): void {
   const isWin = process.platform === "win32";
+  const defaultScriptInterpreter: ScriptInterpreter =
+    isWin && ["powershell", "pwsh", "cmd", "bash", "sh"].includes(config.defaultShell)
+      ? (config.defaultShell as ScriptInterpreter)
+      : isWin
+        ? "pwsh"
+        : "bash";
 
   server.registerTool(
     "exec_command",
     {
       title: "Execute Shell Command",
       description:
-        "Execute a shell command inside the sandboxed workspace. On Windows, uses PowerShell (or CMD). Returns output immediately or session ID if long-running.",
+        "Execute a shell command inside the sandboxed workspace. On Windows, Git Bash is preferred automatically and PowerShell 7 is the fallback; Windows PowerShell and CMD remain available when explicitly selected. Returns output immediately or session ID if long-running.",
       inputSchema: z.object({
         cmd: z.string().min(1).describe("The shell command to execute."),
         workdir: z
@@ -75,7 +81,7 @@ export function registerExecTools(
           .enum(["powershell", "cmd", "pwsh", "bash", "sh"])
           .optional()
           .describe(
-            "Shell to use. Defaults to powershell on Windows, bash on Linux.",
+            `Shell to use. Defaults to ${config.defaultShell}.`,
           ),
         env: z
           .record(z.string(), z.string())
@@ -119,30 +125,8 @@ export function registerExecTools(
     }) =>
       runTool(async () => {
         const cwd = fileService.resolve(workdir || ".");
-        const selectedShell = shell || (isWin ? "powershell" : "bash");
-
-        let executable: string = selectedShell;
-        let args: string[] = [];
-
-        if (selectedShell === "powershell") {
-          executable = "powershell.exe";
-          args = [
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            wrapPowerShellCommand(cmd),
-          ];
-        } else if (selectedShell === "cmd") {
-          executable = "cmd.exe";
-          args = ["/c", cmd];
-        } else if (selectedShell === "pwsh") {
-          executable = "pwsh";
-          args = ["-NoProfile", "-Command", cmd];
-        } else {
-          executable = "bash";
-          args = ["-c", cmd];
-        }
+        const selectedShell = shell || config.defaultShell;
+        const { executable, args } = createShellInvocation(selectedShell, cmd);
 
         const sessionId = processManager.start({
           executable,
@@ -171,12 +155,12 @@ export function registerExecTools(
     {
       title: "Run Multi-line Script",
       description:
-        "Execute a multi-line script (PowerShell, Batch, Node.js, Python) inside the sandboxed workspace.",
+        "Execute a multi-line script (PowerShell 7/5.1, Batch, Bash, Node.js, Python) inside the sandboxed workspace.",
       inputSchema: z.object({
         script: z.string().min(1).describe("Complete script contents."),
         interpreter: z
-          .enum(["powershell", "cmd", "node", "python", "bash", "sh", "custom"])
-          .default(isWin ? "powershell" : "bash")
+          .enum(["powershell", "pwsh", "cmd", "node", "python", "bash", "sh", "custom"])
+          .default(defaultScriptInterpreter)
           .describe("Script interpreter language."),
         customInterpreter: z
           .string()

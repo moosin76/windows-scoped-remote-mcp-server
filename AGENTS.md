@@ -218,11 +218,14 @@ Provider tool 호출이 실패할 경우 Gateway를 종료하지 말고 사용�
 
 ## 문서 인코딩 규칙
 
-- 모든 프로젝트 문서는 **UTF-8**로 저장한다.
-- Markdown, YAML, JSON, 환경 변수 예제 등 텍스트 문서는 UTF-8을 기본 인코딩으로 사용한다.
+- 모든 프로젝트 소스와 문서는 **UTF-8 without BOM**으로 저장하는 것을 기본 규칙으로 한다.
+- Markdown, TypeScript/JavaScript, YAML, JSON, SQL, 환경 변수 예제 등 텍스트 파일은 UTF-8 without BOM을 사용한다.
+- Windows PowerShell 5.1의 `Set-Content`/`Out-File -Encoding UTF8`은 BOM을 만들 수 있으므로 소스/문서 생성에 사용하지 않는다.
+- PowerShell 7(`pwsh`) 또는 WSR의 `write_file`/`apply_patch`를 우선 사용한다.
+- 예외적으로 Windows PowerShell 5.1에서 실행해야 하는 **임시 `.ps1` 실행 파일**은 한글 소스 디코딩 호환을 위해 BOM을 허용한다. 저장소의 일반 소스/문서에는 적용하지 않는다.
 - 새 문서를 만들거나 기존 문서를 수정할 때 한글이 `?`, `U+FFFD` 등으로 깨지지 않았는지 확인한다.
-- 가능하면 UTF-8 BOM 없이 저장한다. 기존 파일의 BOM은 특별한 호환성 이유가 없다면 제거한다.
-- 문서 작업 후에는 UTF-8 디코딩 검사를 수행하고, 인코딩 오류나 replacement character(`U+FFFD`)가 없는지 확인한다.
+- 기존 파일의 BOM은 특별한 호환성 이유가 없다면 제거한다.
+- 문서 작업 후에는 UTF-8 디코딩 검사와 BOM 검사를 수행하고, 인코딩 오류나 replacement character(`U+FFFD`)가 없는지 확인한다.
 
 ## AI 도구 간 작업 인계 규칙
 
