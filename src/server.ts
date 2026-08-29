@@ -8,8 +8,10 @@ import { WorkspaceManager } from "./workspace.js";
 import { BrowserManager } from "./browser-manager.js";
 import { createProviderRegistry } from "./providers/provider-factory.js";
 import { ProviderScheduler } from "./providers/provider-scheduler.js";
+import { ensurePreferredWindowsShell } from "./shells.js";
 
 async function main() {
+  ensurePreferredWindowsShell();
   const config = loadConfig(process.env, process.cwd());
   const projectRoot = process.cwd();
   const workspaceManager = new WorkspaceManager(config.workspaceRoots);

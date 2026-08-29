@@ -306,13 +306,21 @@ npm run build
 npm test
 ```
 
-Windows에서는 `start.bat`를 사용하는 방법도 지원합니다.
+Windows에서는 CMD/PowerShell용 `start.bat`와 Git Bash용 `start.sh`를 모두 지원합니다.
 
 ```cmd
 start.bat
 ```
 
-`start.bat`는 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
+```bash
+./start.sh
+# 또는
+bash start.sh
+```
+
+두 시작 스크립트는 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
+
+WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되어 있으면 PATH 등록 여부와 관계없이 일반적인 Git for Windows 설치 경로까지 탐색해 Git Bash를 우선 사용합니다. Git Bash를 찾지 못하면 PowerShell 7(`pwsh`)을 사용하며, PowerShell 7도 없으면 `winget`으로 설치를 시도합니다.
 
 ---
 
