@@ -166,7 +166,7 @@ WSR 자체의 실행 상태를 한 번에 확인하는 read-only 진단 Tool을 
 
 - Provider 설정/상태 UI 또는 관리 편의 기능
 - WSR 배포/업데이트 자동화 개선
-- 추가 MCP Provider(Blender 등)는 실제 프로젝트 수요가 생길 때 추가
+- Blender MCP Provider는 2026-09-07 실제 프로젝트 수요로 선행 구현. 이후 추가 MCP Provider는 실제 프로젝트 수요가 생길 때 추가
 
 ---
 

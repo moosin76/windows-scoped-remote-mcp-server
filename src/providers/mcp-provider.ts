@@ -1,10 +1,11 @@
-﻿import {
+import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import type { Tool } from "@modelcontextprotocol/client";
 import { Client as LegacyClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 export interface McpProvider {
   readonly id: string;
@@ -22,24 +23,32 @@ export interface McpProvider {
   remoteToolName(namespacedToolName: string): string;
 }
 
-export type RemoteMcpTransport = "streamable-http" | "sse";
+export type RemoteMcpTransport = "streamable-http" | "sse" | "stdio";
 
 export interface RemoteMcpProviderOptions {
   id: string;
   namespace: string;
-  url: string;
+  url?: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
   clientName?: string;
   clientVersion?: string;
   requestInit?: RequestInit;
   transport?: RemoteMcpTransport;
 }
 
-/** Generic remote MCP provider supporting Streamable HTTP and legacy SSE transports. */
+/** Generic MCP provider supporting Streamable HTTP, legacy SSE, and local stdio transports. */
 export class RemoteMcpProvider implements McpProvider {
   readonly id: string;
   readonly namespace: string;
 
-  private readonly url: URL;
+  private readonly url?: URL;
+  private readonly command?: string;
+  private readonly args?: string[];
+  private readonly env?: Record<string, string>;
+  private readonly cwd?: string;
   private readonly clientName: string;
   private readonly clientVersion: string;
   private readonly requestInit?: RequestInit;
@@ -53,11 +62,32 @@ export class RemoteMcpProvider implements McpProvider {
   constructor(options: RemoteMcpProviderOptions) {
     this.id = options.id;
     this.namespace = options.namespace;
-    this.url = new URL(options.url);
     this.clientName = options.clientName ?? "windows-scoped-remote-mcp-gateway";
     this.clientVersion = options.clientVersion ?? "1.0.0";
     this.requestInit = options.requestInit;
     this.transportType = options.transport ?? "streamable-http";
+
+    if (this.transportType === "stdio") {
+      const command = options.command?.trim();
+      if (!command) {
+        throw new Error(
+          `MCP provider '${this.id}' requires command for stdio transport`,
+        );
+      }
+      this.command = command;
+      this.args = options.args?.slice();
+      this.env = options.env ? { ...options.env } : undefined;
+      this.cwd = options.cwd;
+      return;
+    }
+
+    const url = options.url?.trim();
+    if (!url) {
+      throw new Error(
+        `MCP provider '${this.id}' requires url for ${this.transportType} transport`,
+      );
+    }
+    this.url = new URL(url);
   }
 
   get lastError(): string | undefined {
@@ -77,12 +107,39 @@ export class RemoteMcpProvider implements McpProvider {
   }
 
   private async createConnection(): Promise<void> {
+    if (this.transportType === "stdio") {
+      const client = new LegacyClient({
+        name: this.clientName,
+        version: this.clientVersion,
+      });
+      const transport = new StdioClientTransport({
+        command: this.command!,
+        args: this.args,
+        env: this.env,
+        cwd: this.cwd,
+      });
+
+      try {
+        await client.connect(transport);
+        this.legacyClient = client;
+        this.connected = true;
+        this._lastError = undefined;
+      } catch (error) {
+        await transport.close().catch(() => undefined);
+        await client.close().catch(() => undefined);
+        this.connected = false;
+        this._lastError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
+      return;
+    }
+
     if (this.transportType === "sse") {
       const client = new LegacyClient({
         name: this.clientName,
         version: this.clientVersion,
       });
-      const transport = new SSEClientTransport(this.url, {
+      const transport = new SSEClientTransport(this.url!, {
         requestInit: this.requestInit,
       });
 
@@ -105,7 +162,7 @@ export class RemoteMcpProvider implements McpProvider {
       name: this.clientName,
       version: this.clientVersion,
     });
-    const transport = new StreamableHTTPClientTransport(this.url, {
+    const transport = new StreamableHTTPClientTransport(this.url!, {
       requestInit: this.requestInit,
     });
 
@@ -142,9 +199,9 @@ export class RemoteMcpProvider implements McpProvider {
   async listTools(): Promise<readonly Tool[]> {
     await this.ensureConnected();
     try {
-      const result = this.transportType === "sse"
-        ? await this.legacyClient!.listTools()
-        : await this.client!.listTools();
+      const result = this.transportType === "streamable-http"
+        ? await this.client!.listTools()
+        : await this.legacyClient!.listTools();
       return result.tools as readonly Tool[];
     } catch (error) {
       await this.markDisconnected(error);
@@ -158,7 +215,7 @@ export class RemoteMcpProvider implements McpProvider {
   ): Promise<Awaited<ReturnType<Client["callTool"]>>> {
     await this.ensureConnected();
     try {
-      if (this.transportType === "sse") {
+      if (this.transportType !== "streamable-http") {
         return await this.legacyClient!.callTool({
           name,
           arguments: args,

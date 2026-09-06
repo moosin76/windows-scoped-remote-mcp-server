@@ -39,6 +39,10 @@ export interface AppConfig {
   cloudflareTunnelToken: string | undefined;
   godotMcpEnabled: boolean;
   godotMcpUrl: string;
+  blenderMcpEnabled: boolean;
+  blenderMcpCommand: string;
+  blenderMcpHost: string;
+  blenderMcpPort: number;
   postgresqlMcpEnabled: boolean;
   postgresqlMcpUrl: string | undefined;
   mcpProviderHealthIntervalMs: number;
@@ -120,6 +124,16 @@ export function loadConfig(
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
   const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
   const godotMcpUrl = env.MCP_GODOT_URL?.trim() || "http://127.0.0.1:8000/mcp";
+  const blenderMcpEnabled = parseBoolean(env.MCP_BLENDER_ENABLED, false);
+  const blenderMcpCommand = env.MCP_BLENDER_COMMAND?.trim() || "uvx";
+  const blenderMcpHost = env.MCP_BLENDER_HOST?.trim() || "127.0.0.1";
+  const blenderMcpPort = parseInteger(
+    env.MCP_BLENDER_PORT,
+    9876,
+    "MCP_BLENDER_PORT",
+    1,
+    65_535,
+  );
   const postgresqlMcpEnabled = parseBoolean(env.MCP_POSTGRESQL_ENABLED, false);
   const postgresqlMcpUrl = env.MCP_POSTGRESQL_URL?.trim() || undefined;
   if (postgresqlMcpEnabled && !postgresqlMcpUrl) {
@@ -183,6 +197,10 @@ export function loadConfig(
     cloudflareTunnelToken,
     godotMcpEnabled,
     godotMcpUrl,
+    blenderMcpEnabled,
+    blenderMcpCommand,
+    blenderMcpHost,
+    blenderMcpPort,
     postgresqlMcpEnabled,
     postgresqlMcpUrl,
     mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),

@@ -4,7 +4,7 @@
 
 WSR에는 PostgreSQL MCP를 연결할 수 있도록 Provider 설정을 준비했다. 다만 **특정 PostgreSQL MCP 구현은 아직 선택하지 않았다.**
 
-WSR의 `RemoteMcpProvider`는 **Streamable HTTP와 SSE transport**를 지원한다. crystaldba/postgres-mcp는 SSE로 연결하며 `http://127.0.0.1:10021/sse` 형태의 endpoint를 사용한다.
+WSR의 `RemoteMcpProvider`는 **Streamable HTTP, legacy SSE, local stdio transport**를 지원한다. crystaldba/postgres-mcp는 SSE로 연결하며 `http://127.0.0.1:10021/sse` 형태의 endpoint를 사용한다.
 
 ## 설정
 

@@ -13,6 +13,24 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
       clientVersion: "1.0.0",
     }));
   }
+  if (config.blenderMcpEnabled) {
+    registry.add(
+      new RemoteMcpProvider({
+        id: "blender",
+        namespace: "blender",
+        transport: "stdio",
+        command: config.blenderMcpCommand,
+        args: ["blender-mcp"],
+        env: {
+          BLENDER_HOST: config.blenderMcpHost,
+          BLENDER_PORT: String(config.blenderMcpPort),
+        },
+        clientName: "windows-scoped-remote-mcp-gateway",
+        clientVersion: "1.0.0",
+      }),
+    );
+  }
+
   if (config.postgresqlMcpEnabled && config.postgresqlMcpUrl) {
     registry.add(new RemoteMcpProvider({
       id: "postgresql",

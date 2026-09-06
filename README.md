@@ -57,7 +57,7 @@ WSR이 유용했다면 GitHub Sponsors를 통해 프로젝트를 후원할 수 �
                                          godot_* blender_*
 ```
 
-WSR 자체는 Gateway 역할을 하고, 외부 MCP는 `RemoteMcpProvider`를 통해 연결합니다.
+WSR 자체는 Gateway 역할을 하고, 외부 MCP는 `RemoteMcpProvider`를 통해 연결합니다. Provider transport는 Streamable HTTP, legacy SSE, local stdio를 지원합니다.
 
 HTTP MCP 계층은 공식 TypeScript SDK v2의 `createMcpHandler`를 사용합니다. `2026-07-28` 클라이언트에는 `server/discover`와 요청별 `_meta` envelope를 제공하고, 기존 클라이언트에는 같은 tool 정의로 2025-era stateless `initialize` fallback을 제공합니다.
 
@@ -339,6 +339,10 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_PROVIDER_RETRY_INTERVAL_MS`  | `5000`                      | 연결되지 않은 Provider 재연결 주기(ms) |
 | `MCP_GODOT_ENABLED`               | `false`                     | Godot MCP Provider 활성화              |
 | `MCP_GODOT_URL`                   | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint                     |
+| `MCP_BLENDER_ENABLED`             | `false`                     | Blender MCP Provider 활성화            |
+| `MCP_BLENDER_COMMAND`             | `uvx`                       | Blender MCP stdio 실행 명령            |
+| `MCP_BLENDER_HOST`                | `127.0.0.1`                 | Blender add-on socket host             |
+| `MCP_BLENDER_PORT`                | `9876`                      | Blender add-on socket port             |
 
 민감한 토큰과 비밀번호는 `.env`에만 저장하고 Git에 커밋하지 마세요.
 
@@ -356,7 +360,8 @@ MCP SDK는 v2 split package 구조를 사용합니다.
 
 - 서버 및 `createMcpHandler`: `@modelcontextprotocol/server`
 - Node/Express adapter: `@modelcontextprotocol/node`
-- Remote Provider client: `@modelcontextprotocol/client`
+- Streamable HTTP Provider client: `@modelcontextprotocol/client`
+- legacy SSE / stdio Provider compatibility client: `@modelcontextprotocol/sdk`
 - 기존 내장 OAuth Authorization Server 호환 계층: `@modelcontextprotocol/server-legacy/auth`
 
 마지막 항목은 공식 v1→v2 마이그레이션 브리지이며 deprecated 상태입니다. discovery 복구와 기존 OAuth 동작 보존을 위해 유지하되, 장기적으로는 전용 OAuth/IdP 라이브러리로 분리해야 합니다.
@@ -422,6 +427,29 @@ WSR은 개발 자동화를 위해 강력한 기능을 제공하므로 다음 원
 
 MIT License
 
+## Blender MCP
+
+WSR은 Blender MCP를 local stdio Provider로 실행합니다. Blender의 `9876` 포트는 MCP HTTP endpoint가 아니라 Blender add-on의 TCP socket이므로, WSR이 `uvx blender-mcp` 프로세스를 시작하고 그 프로세스가 add-on socket에 연결하는 구조입니다.
+
+Blender add-on을 최신 상태로 설치한 뒤 Blender에서 add-on을 다시 활성화하거나 Blender를 재시작하고 **Start MCP Server**를 누릅니다.
+
+```bash
+uvx blender-mcp install-addon
+```
+
+루트 `.env` 설정 예:
+
+```env
+MCP_BLENDER_ENABLED=true
+MCP_BLENDER_COMMAND=uvx
+MCP_BLENDER_HOST=127.0.0.1
+MCP_BLENDER_PORT=9876
+```
+
+연결된 Blender 도구는 WSR에서 `blender_*` namespace로 노출됩니다. 설치, 구조, 진단 절차는 `docs/blender-mcp-provider.md`를 참고하세요.
+
+---
+
 ## PostgreSQL MCP (CrystalDBA)
 
 WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재 검증된 구성은 다음과 같습니다.
@@ -429,6 +457,7 @@ WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재
 | Provider | Endpoint | Transport | Tools |
 | --- | --- | --- | ---: |
 | Godot | `http://127.0.0.1:8000/mcp` | Streamable HTTP | 45 |
+| Blender (ahujasid/blender-mcp) | `uvx blender-mcp` → add-on socket `127.0.0.1:9876` | stdio | 28 |
 | PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
 
 PostgreSQL Provider를 활성화하려면 루트 `.env`에 다음 값을 설정합니다.

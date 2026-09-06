@@ -8,7 +8,7 @@ Godot, Blender 또는 다른 Remote MCP를 Windows Scoped Remote MCP Server에 �
 
 ```text
 외부 MCP
-   ↓ Streamable HTTP
+   ↓ Streamable HTTP / legacy SSE / stdio
 RemoteMcpProvider
    ↓
 ProviderRegistry
@@ -18,15 +18,15 @@ WSR MCP Server
 ChatGPT / Claude 등 MCP Client
 ```
 
-새 MCP마다 별도의 HTTP client나 Gateway 구현을 만들지 말고 `RemoteMcpProvider`를 재사용한다.
+새 MCP마다 별도의 client나 Gateway 구현을 만들지 말고 `RemoteMcpProvider`의 Streamable HTTP / legacy SSE / stdio transport를 재사용한다.
 
-현재 SDK v2에서는 outbound client를 `@modelcontextprotocol/client`에서 가져온다. Provider가 legacy-only인지 modern discovery를 지원하는지 확인하고 negotiation 정책을 결정한다. 기존 Provider의 정책을 바꿀 때는 Godot처럼 2025 `initialize`만 지원하는 서버의 fallback도 함께 회귀 테스트한다.
+Streamable HTTP outbound client는 `@modelcontextprotocol/client` v2를 사용하고, legacy SSE와 stdio transport는 `@modelcontextprotocol/sdk` 1.x compatibility client를 사용한다. Provider의 실제 transport와 protocol 지원 상태를 확인한 뒤 연결 경로를 선택한다. 기존 Provider 정책을 바꿀 때는 Godot처럼 2025 `initialize`만 지원하는 서버의 fallback도 함께 회귀 테스트한다.
 
 ## 1. 연결 정보 확인
 
 먼저 MCP의 공식 연결 방법을 확인한다.
 
-- MCP endpoint URL
+- MCP endpoint URL 또는 stdio 실행 command/args
 - transport 방식
 - 인증 필요 여부
 - `tools/list` 지원 여부
@@ -50,13 +50,15 @@ new RemoteMcpProvider({
 });
 ```
 
-Blender도 동일한 구조를 사용한다.
+Blender도 동일한 `RemoteMcpProvider`를 사용하지만 transport는 stdio다.
 
 ```ts
 new RemoteMcpProvider({
   id: "blender",
   namespace: "blender",
-  url: "http://127.0.0.1:xxxx/mcp",
+  transport: "stdio",
+  command: "uvx",
+  args: ["blender-mcp"],
 });
 ```
 
@@ -244,12 +246,13 @@ feat: add <provider> MCP integration
 
 ## Transport 선택 규칙
 
-Provider를 추가할 때 endpoint URL만 보고 transport를 추측하지 않는다. 서버가 Streamable HTTP인지 legacy SSE인지 먼저 확인한다.
+Provider를 추가할 때 endpoint URL만 보고 transport를 추측하지 않는다. 서버가 Streamable HTTP인지 legacy SSE인지, 또는 MCP client가 child process를 직접 실행하는 stdio 방식인지 먼저 확인한다.
 
 - Streamable HTTP: 기본값 `transport: "streamable-http"`, 현재 Godot에서 사용.
 - legacy SSE: `transport: "sse"`, 현재 CrystalDBA postgres-mcp에서 사용.
+- stdio: `transport: "stdio"`, `command`/`args`/`env`로 child MCP process를 실행하며 현재 Blender MCP에서 사용.
 
-`@modelcontextprotocol/client 2.x`에는 legacy SSE transport가 없으므로 WSR은 SSE Provider에 한해 `@modelcontextprotocol/sdk 1.x` compatibility client를 사용한다. 신규 Provider가 SSE라면 이 경로를 재사용하고 Godot의 Streamable HTTP 경로를 변경하지 않는다.
+`@modelcontextprotocol/client 2.x`에는 현재 WSR이 필요한 legacy SSE / stdio compatibility 경로가 없으므로 두 transport는 `@modelcontextprotocol/sdk 1.x` client를 사용한다. 신규 Provider는 자신의 transport에 맞는 기존 경로를 재사용하고 Godot의 Streamable HTTP 경로를 변경하지 않는다.
 
 PostgreSQL 예:
 

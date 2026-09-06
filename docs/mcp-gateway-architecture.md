@@ -16,7 +16,8 @@ Windows Scoped Remote MCP Server
   ├─ Playwright tools
   └─ ProviderRegistry
        ├─ Godot Remote MCP
-       └─ Future: Blender Remote MCP
+       ├─ Blender MCP (stdio → add-on socket)
+       └─ PostgreSQL Remote MCP
 ```
 
 ## Provider 계층
@@ -34,7 +35,7 @@ McpProvider
 └─ remoteToolName()
 ```
 
-현재 `RemoteMcpProvider`는 Streamable HTTP MCP 서버를 위한 범용 구현이다.
+현재 `RemoteMcpProvider`는 Streamable HTTP, legacy SSE, local stdio MCP 서버를 위한 범용 구현이다.
 
 ## MCP SDK v2와 inbound transport
 
@@ -93,9 +94,9 @@ Godot Provider: get_scene
 Godot MCP
 ```
 
-## 향후 확장
+## Provider 확장
 
-Blender를 붙일 때는 새로운 전용 transport 구현보다 `RemoteMcpProvider`를 우선 재사용한다.
+Blender는 `RemoteMcpProvider`의 stdio transport로 연결한다. 새로운 Provider를 추가할 때도 전용 Gateway를 만들기보다 기존 transport를 우선 재사용한다.
 
 ```text
 ProviderRegistry
@@ -166,14 +167,17 @@ RemoteMcpProvider
 ├─ streamable-http
 │  └─ @modelcontextprotocol/client 2.x
 │     └─ Godot MCP /mcp
-└─ sse
+├─ sse
    └─ @modelcontextprotocol/sdk 1.x compatibility client
       └─ CrystalDBA postgres-mcp /sse
+└─ stdio
+   └─ @modelcontextprotocol/sdk 1.x compatibility client
+      └─ Blender MCP (`uvx blender-mcp` → add-on socket 9876)
 ```
 
-현재 `@modelcontextprotocol/client 2.0.0`에는 legacy `SSEClientTransport`가 노출되지 않으므로 SSE Provider 호환성은 `@modelcontextprotocol/sdk 1.30.0`을 병행 사용한다. 이 호환 계층은 outbound Provider 연결에만 사용하며 WSR inbound의 MCP 2026-07-28 지원을 되돌리지 않는다.
+현재 legacy SSE와 stdio Provider는 `@modelcontextprotocol/sdk 1.30.0` compatibility client를 사용하고, Streamable HTTP Provider는 `@modelcontextprotocol/client 2.x`를 사용한다. 이 호환 계층은 outbound Provider 연결에만 사용하며 WSR inbound의 MCP 2026-07-28 지원을 되돌리지 않는다.
 
-검증된 Provider 구성은 Godot 45 tools + PostgreSQL 9 tools = 총 54 remote tools이다. Provider 상태는 `mcp_provider_status`로 확인한다.
+검증된 Provider 구성은 Godot 45 tools + Blender 28 tools + PostgreSQL 9 tools다. Provider 상태는 `mcp_provider_status`로 확인한다.
 
 ## MCP 세션별 Workspace 상태
 
