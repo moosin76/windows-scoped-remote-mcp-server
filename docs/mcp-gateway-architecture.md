@@ -17,6 +17,7 @@ Windows Scoped Remote MCP Server
   └─ ProviderRegistry
        ├─ Godot Remote MCP
        ├─ Blender MCP (stdio → add-on socket)
+       ├─ Windows Computer Use MCP (stdio → Windows UI Automation)
        └─ PostgreSQL Remote MCP
 ```
 
@@ -101,7 +102,8 @@ Blender는 `RemoteMcpProvider`의 stdio transport로 연결한다. 새로운 Pro
 ```text
 ProviderRegistry
 ├─ godot / godot
-└─ blender / blender
+├─ blender / blender
+└─ windows / windows
 ```
 
 Provider 수가 많아질 때는 설정 기반 Provider 생성과 연결 상태/health 관리로 확장한다.
@@ -116,7 +118,8 @@ WSR Gateway
 ├── Playwright       ← 별도 상태
 └── Remote Providers
     ├── Godot        ← 연결 실패해도 Gateway 종료 금지
-    └── Blender      ← 연결 실패해도 Gateway 종료 금지
+    ├── Blender      ← 연결 실패해도 Gateway 종료 금지
+    └── Windows      ← 연결 실패해도 Gateway 종료 금지
 ```
 
 Provider 연결 상태는 `mcp_provider_status`로 확인할 수 있습니다. Provider가 실행되지 않은 상태에서 이미 노출된 Provider tool을 호출하면 해당 Provider를 시작하라는 명확한 오류가 반환됩니다.
@@ -172,12 +175,13 @@ RemoteMcpProvider
       └─ CrystalDBA postgres-mcp /sse
 └─ stdio
    └─ @modelcontextprotocol/sdk 1.x compatibility client
-      └─ Blender MCP (`uvx blender-mcp` → add-on socket 9876)
+      ├─ Blender MCP (`uvx blender-mcp` → add-on socket 9876)
+      └─ Windows-MCP (`uvx windows-mcp serve` → Windows UI Automation)
 ```
 
 현재 legacy SSE와 stdio Provider는 `@modelcontextprotocol/sdk 1.30.0` compatibility client를 사용하고, Streamable HTTP Provider는 `@modelcontextprotocol/client 2.x`를 사용한다. 이 호환 계층은 outbound Provider 연결에만 사용하며 WSR inbound의 MCP 2026-07-28 지원을 되돌리지 않는다.
 
-검증된 Provider 구성은 Godot 45 tools + Blender 28 tools + PostgreSQL 9 tools다. Provider 상태는 `mcp_provider_status`로 확인한다.
+검증된 Provider 구성에는 Godot, Blender, PostgreSQL에 더해 Windows Computer Use Provider가 포함된다. Windows-MCP는 기본 allowlist 13개 도구만 노출하며 Provider 상태는 `mcp_provider_status`로 확인한다.
 
 ## MCP 세션별 Workspace 상태
 

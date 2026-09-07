@@ -43,6 +43,9 @@ export interface AppConfig {
   blenderMcpCommand: string;
   blenderMcpHost: string;
   blenderMcpPort: number;
+  windowsMcpEnabled: boolean;
+  windowsMcpCommand: string;
+  windowsMcpTools: string[];
   postgresqlMcpEnabled: boolean;
   postgresqlMcpUrl: string | undefined;
   mcpProviderHealthIntervalMs: number;
@@ -134,6 +137,20 @@ export function loadConfig(
     1,
     65_535,
   );
+  const windowsMcpEnabled = parseBoolean(env.MCP_WINDOWS_ENABLED, false);
+  const windowsMcpCommand = env.MCP_WINDOWS_COMMAND?.trim() || "uvx";
+  const windowsMcpTools = (
+    env.MCP_WINDOWS_TOOLS?.trim() ||
+    "DisplayInventory,Snapshot,Screenshot,Click,Type,Scroll,Move,Shortcut,Wait,WaitFor,MultiSelect,MultiEdit,Clipboard"
+  )
+    .split(",")
+    .map((tool) => tool.trim())
+    .filter(Boolean);
+  if (windowsMcpEnabled && windowsMcpTools.length === 0) {
+    throw new Error(
+      "MCP_WINDOWS_TOOLS must contain at least one tool when MCP_WINDOWS_ENABLED=true",
+    );
+  }
   const postgresqlMcpEnabled = parseBoolean(env.MCP_POSTGRESQL_ENABLED, false);
   const postgresqlMcpUrl = env.MCP_POSTGRESQL_URL?.trim() || undefined;
   if (postgresqlMcpEnabled && !postgresqlMcpUrl) {
@@ -201,6 +218,9 @@ export function loadConfig(
     blenderMcpCommand,
     blenderMcpHost,
     blenderMcpPort,
+    windowsMcpEnabled,
+    windowsMcpCommand,
+    windowsMcpTools,
     postgresqlMcpEnabled,
     postgresqlMcpUrl,
     mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),

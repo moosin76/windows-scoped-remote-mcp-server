@@ -32,6 +32,31 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
     );
   }
 
+  if (config.windowsMcpEnabled) {
+    registry.add(
+      new RemoteMcpProvider({
+        id: "windows",
+        namespace: "windows",
+        transport: "stdio",
+        command: config.windowsMcpCommand,
+        args: [
+          "windows-mcp",
+          "serve",
+          "--tools",
+          config.windowsMcpTools.join(","),
+        ],
+        env: {
+          PYTHONUTF8: "1",
+          ANONYMIZED_TELEMETRY: "false",
+          WINDOWS_MCP_DISABLE_FLASH: "1",
+        },
+        stdioStderrMode: "warnings",
+        clientName: "windows-scoped-remote-mcp-gateway",
+        clientVersion: "1.0.0",
+      }),
+    );
+  }
+
   if (config.postgresqlMcpEnabled && config.postgresqlMcpUrl) {
     registry.add(new RemoteMcpProvider({
       id: "postgresql",

@@ -343,6 +343,9 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_BLENDER_COMMAND`             | `uvx`                       | Blender MCP stdio 실행 명령            |
 | `MCP_BLENDER_HOST`                | `127.0.0.1`                 | Blender add-on socket host             |
 | `MCP_BLENDER_PORT`                | `9876`                      | Blender add-on socket port             |
+| `MCP_WINDOWS_ENABLED`             | `false`                     | Windows Computer Use Provider 활성화   |
+| `MCP_WINDOWS_COMMAND`             | `uvx`                       | Windows-MCP stdio 실행 명령            |
+| `MCP_WINDOWS_TOOLS`               | UI allowlist                | WSR에 노출할 Windows-MCP 도구 목록     |
 
 민감한 토큰과 비밀번호는 `.env`에만 저장하고 Git에 커밋하지 마세요.
 
@@ -450,6 +453,22 @@ MCP_BLENDER_PORT=9876
 
 ---
 
+## Windows Computer Use MCP
+
+WSR은 CursorTouch/Windows-MCP를 local stdio Provider로 실행할 수 있습니다. 별도 소스를 `mcp-servers/`에 복사하지 않고 `uvx windows-mcp serve`를 사용하므로, 첫 WSR 시작 시 uv가 패키지와 의존성을 내려받아 캐시하고 이후 WSR 수명과 함께 실행/종료합니다.
+
+기본 allowlist는 Windows 화면 관찰과 UI 입력에 필요한 도구만 유지합니다. `App`, `PowerShell`, `FileSystem`, `Process`, `Notification`, `Registry`, `Scrape`는 WSR 기존 기능과 겹치거나 권한 범위가 넓거나 현재 목적에 불필요해 기본적으로 노출하지 않습니다.
+
+```env
+MCP_WINDOWS_ENABLED=true
+MCP_WINDOWS_COMMAND=uvx
+MCP_WINDOWS_TOOLS=DisplayInventory,Snapshot,Screenshot,Click,Type,Scroll,Move,Shortcut,Wait,WaitFor,MultiSelect,MultiEdit,Clipboard
+```
+
+Provider 실행 환경에서는 Python UTF-8 모드를 강제하고 Windows-MCP 익명 telemetry를 끄며 screenshot flash overlay도 비활성화합니다. 연결된 도구는 `windows_*` namespace로 노출됩니다. 자세한 내용은 `docs/windows-computer-use-provider.md`를 참고하세요.
+
+---
+
 ## PostgreSQL MCP (CrystalDBA)
 
 WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재 검증된 구성은 다음과 같습니다.
@@ -458,6 +477,7 @@ WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재
 | --- | --- | --- | ---: |
 | Godot | `http://127.0.0.1:8000/mcp` | Streamable HTTP | 45 |
 | Blender (ahujasid/blender-mcp) | `uvx blender-mcp` → add-on socket `127.0.0.1:9876` | stdio | 28 |
+| Windows (CursorTouch/Windows-MCP) | `uvx windows-mcp serve` | stdio | 13 (기본 allowlist) |
 | PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
 
 PostgreSQL Provider를 활성화하려면 루트 `.env`에 다음 값을 설정합니다.
