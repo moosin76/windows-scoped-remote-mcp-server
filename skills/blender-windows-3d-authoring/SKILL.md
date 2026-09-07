@@ -496,3 +496,27 @@ Body               = Collision surface
 작은 체형에 큰 옷을 입히면 원래 큰 rest geometry가 중력/충돌에 의해 헐렁하게 내려오고, 큰 체형에 작은 옷을 입히면 cloth stretch/tension이 발생해야 한다. canonical mesh 자체를 체형마다 미리 변형하면 이 정보를 잃는다.
 
 의상에는 Soft Body보다 Cloth + Collision을 우선한다. 과도한 strain은 후속 fit 평가에서 tight/invalid 상태로 해석할 수 있다.
+
+
+### 연속 곡면 우선 — panel snap으로 volume을 만들지 않는다
+
+DrapeFit 티셔츠 직접 모델링에서 `front/back panel -> side center snap` 방식은 수치상 seam gap이 작아도 화면에서는 종이접기처럼 보였다.
+
+재사용 규칙:
+
+- 몸통/차체/튜브형 부품처럼 volume이 중요한 형상은 가능한 한 **closed cross-section ring -> loft**로 생성한다.
+- front/back surface를 한 점/한 선에 강제로 모아 volume을 만들지 않는다.
+- joint/겨드랑이/휠아치처럼 두 곡면이 만나는 영역은 single point가 아니라 **shared arc / shared loop**를 사용한다.
+- 화면에서 종이접기/핀치처럼 보이면 먼저 seam gap보다 `cross-section topology`와 `boundary loop` 구조를 확인한다.
+- 여러 object를 나중에 join하더라도, construction 단계부터 서로 같은 boundary curve를 공유하게 만든다.
+
+DrapeFit에서 실제로 안정적이었던 구조:
+
+```text
+Torso: 96-point continuous oval closed ring x vertical loft
+Armhole: front boundary + shoulder + back boundary
+Underarm: torso side arc
+Sleeve root: armhole boundaries + underarm arc를 그대로 재사용
+```
+
+이 방식으로 torso side의 이웃 edge-length ratio max가 약 1.054로 유지됐고, 실제 mesh-surface 기준 torso/upper gap은 0.01mm 미만까지 수렴했다. 이 수치는 특정 모델의 acceptance threshold가 아니라, `continuous surface` 구조가 실제로 seam-snap 방식보다 안정적이었다는 작업 기록이다.
