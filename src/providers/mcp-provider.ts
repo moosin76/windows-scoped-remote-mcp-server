@@ -33,6 +33,7 @@ export interface RemoteMcpProviderOptions {
   args?: string[];
   env?: Record<string, string>;
   cwd?: string;
+  stdioStderrMode?: "inherit" | "warnings";
   clientName?: string;
   clientVersion?: string;
   requestInit?: RequestInit;
@@ -49,6 +50,7 @@ export class RemoteMcpProvider implements McpProvider {
   private readonly args?: string[];
   private readonly env?: Record<string, string>;
   private readonly cwd?: string;
+  private readonly stdioStderrMode: "inherit" | "warnings";
   private readonly clientName: string;
   private readonly clientVersion: string;
   private readonly requestInit?: RequestInit;
@@ -66,6 +68,7 @@ export class RemoteMcpProvider implements McpProvider {
     this.clientVersion = options.clientVersion ?? "1.0.0";
     this.requestInit = options.requestInit;
     this.transportType = options.transport ?? "streamable-http";
+    this.stdioStderrMode = options.stdioStderrMode ?? "inherit";
 
     if (this.transportType === "stdio") {
       const command = options.command?.trim();
@@ -117,7 +120,11 @@ export class RemoteMcpProvider implements McpProvider {
         args: this.args,
         env: this.env,
         cwd: this.cwd,
+        stderr: this.stdioStderrMode === "warnings" ? "pipe" : "inherit",
       });
+      if (this.stdioStderrMode === "warnings") {
+        this.forwardStdioWarnings(transport);
+      }
 
       try {
         await client.connect(transport);
@@ -178,6 +185,25 @@ export class RemoteMcpProvider implements McpProvider {
       this._lastError = error instanceof Error ? error.message : String(error);
       throw error;
     }
+  }
+
+  private forwardStdioWarnings(transport: StdioClientTransport): void {
+    const stderr = transport.stderr;
+    if (!stderr) return;
+
+    let pending = "";
+    stderr.on("data", (chunk: Buffer | string) => {
+      pending += chunk.toString();
+      let newline = pending.indexOf("\n");
+      while (newline >= 0) {
+        const line = pending.slice(0, newline).replace(/\r$/, "");
+        pending = pending.slice(newline + 1);
+        if (/\b(?:WARNING|ERROR|CRITICAL)\b/i.test(line)) {
+          console.warn(`[MCP Provider:${this.id}] ${line}`);
+        }
+        newline = pending.indexOf("\n");
+      }
+    });
   }
 
   async close(): Promise<void> {

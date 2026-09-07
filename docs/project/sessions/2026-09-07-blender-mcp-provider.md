@@ -94,3 +94,16 @@ WSR에서 사용하는 구현 빌드 결과로 `RemoteMcpProvider(transport="std
 3. WSR 재시작 후 ChatGPT MCP 도구 새로고침
 4. `mcp_provider_status`에서 Blender connected 확인
 5. ChatGPT에서 `blender_get_scene_info` 호출 확인
+
+## 10초 주기 Blender INFO 로그 정리
+
+WSR 재시작 후 Blender MCP 콘솔에 `Processing request of type ListToolsRequest`가 약 10초마다 반복되는 것을 확인했다. 이는 오류가 아니라 `ProviderScheduler`의 기본 health/tool-list 검사 주기(10초)가 `tools/list`를 호출하고, stdio child process의 stderr가 WSR 콘솔에 그대로 상속되어 Blender MCP의 INFO 로그가 노출된 것이다.
+
+Blender stdio Provider에는 `stdioStderrMode: "warnings"`를 적용했다. Scheduler의 10초 health/tool-change 검사는 유지하되 Blender MCP의 일반 INFO stderr는 소비해서 버리고 `WARNING` / `ERROR` / `CRITICAL`만 WSR 콘솔로 전달한다. 범용 stdio Provider 기본값은 기존 호환을 위해 `inherit`로 유지한다.
+
+검증:
+
+- `npm run typecheck` 성공
+- `test/mcp-provider.test.ts` 성공: 5 tests
+- `npm run build` 성공
+- 실제 Blender stdio Provider에서 `tools/list` 3회 반복: 28 tools 유지, stderr INFO 출력 없음

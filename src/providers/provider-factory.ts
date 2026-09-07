@@ -25,6 +25,7 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
           BLENDER_HOST: config.blenderMcpHost,
           BLENDER_PORT: String(config.blenderMcpPort),
         },
+        stdioStderrMode: "warnings",
         clientName: "windows-scoped-remote-mcp-gateway",
         clientVersion: "1.0.0",
       }),
