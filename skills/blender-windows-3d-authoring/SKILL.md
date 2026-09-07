@@ -407,3 +407,92 @@ h162-w57 Body + h162-w57 Underwear
 ```
 
 이 패턴은 GAS에서도 캐릭터 기본 모델 + 기본 장비/의상 상태를 기준 scene으로 고정한 뒤 게임 자산을 제작할 때 그대로 재사용할 수 있다.
+
+## 실전 보강 — DrapeFit direct garment iteration (2026-09-07)
+
+### Immutable baseline + working copy
+
+사람/차량 등 반복 제작에서 기준 asset을 현재 작업 파일로 직접 수정하지 않는다.
+
+권장:
+
+```text
+reference mannequin / base scene.blend   # immutable baseline
+        ↓ Save As
+working/generated/<asset>-working.blend  # 반복 작업
+        ↓
+final canonical asset
+```
+
+DrapeFit에서는 Body + Underwear를 먼저 기준 `.blend`로 고정하고, 상품 티셔츠는 generated working copy에서만 수정했다. GAS의 캐릭터/차량 기준 scene에도 같은 패턴을 사용한다.
+
+### Blender MCP wrapper에서 Windows path
+
+Node.js MCP client wrapper 안에서 Python script path를 동적으로 조합할 때는 forward slash가 가장 안전했다.
+
+```js
+const p = `D:/Godot/DrapeFit/tools/blender/${file}`;
+const code = `path=r'${p}'\nexec(compile(open(path,encoding='utf-8').read(), path, 'exec'))`;
+```
+
+`D:\\...\\${file}`처럼 template interpolation 바로 앞에 backslash가 오면 `${file}`이 literal로 전달되는 실수가 생길 수 있다.
+
+### heredoc shell 주의
+
+`node - <<'NODE'` 형태는 Bash/Git Bash에서 사용한다. PowerShell의 `exec_command`에 그대로 넣으면 `<` parser error가 나며 Blender에는 호출이 도달하지 않는다.
+
+- heredoc 필요 → `shell: bash`
+- PowerShell → `.mjs` 파일을 저장 후 `node file.mjs` 실행하거나 PowerShell 문법 사용
+
+### 구조 수치 우선, screenshot은 형태 검증
+
+의상 iteration에서 실제 효과가 좋았던 순서:
+
+```text
+Blender geometry 수치/경계 검증
+→ seam/boundary gap 수정
+→ viewport 관찰
+→ transparent render
+→ OpenCV alpha silhouette
+→ Vision/사람 눈 형태 판단
+```
+
+예: sleeve가 화면상 이상한 것을 감으로만 수정하지 않고 root→armhole nearest distance를 측정했다. 초기 median 약 77mm를 실제 armhole boundary 기반 root로 바꿔 약 1~2mm대로 줄였다.
+
+### Transparent PNG + OpenCV alpha mask
+
+OpenCV silhouette 검증은 배경 분리 threshold보다 **Blender transparent RGBA render의 alpha channel**을 사용하는 것이 안정적이다.
+
+권장 캡처:
+
+```text
+Front / Right / Back / Perspective
+800x800
+fixed orthographic camera (정면/측면)
+film_transparent = true
+mannequin/reference objects hide_render = true
+```
+
+DrapeFit smoke에서 정상 측정된 예:
+
+```text
+Front symmetry IoU ≈ 0.9998
+Front W/H aspect ≈ 1.101
+Right depth/height aspect ≈ 0.443
+```
+
+숫자는 특정 상품 기준이므로 공용 skill의 acceptance threshold로 하드코딩하지 않는다.
+
+### Canonical model과 fit simulation 분리
+
+Body를 construction reference로 사용하는 경우에도 canonical object를 body surface에 억지로 projection하여 모든 penetration을 제거하지 않는다.
+
+```text
+canonical garment = rest size / 공식 치수 권위
+fit copy           = Cloth 변형 결과
+Body               = Collision surface
+```
+
+작은 체형에 큰 옷을 입히면 원래 큰 rest geometry가 중력/충돌에 의해 헐렁하게 내려오고, 큰 체형에 작은 옷을 입히면 cloth stretch/tension이 발생해야 한다. canonical mesh 자체를 체형마다 미리 변형하면 이 정보를 잃는다.
+
+의상에는 Soft Body보다 Cloth + Collision을 우선한다. 과도한 strain은 후속 fit 평가에서 tight/invalid 상태로 해석할 수 있다.
