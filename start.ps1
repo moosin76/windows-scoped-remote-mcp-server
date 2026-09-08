@@ -42,6 +42,13 @@ if (-not (Test-Path $cloudflaredPath)) {
     }
 }
 
-# 4. Start Server
+# 4. Give the long-running WSR process extra V8 heap headroom.
+# Respect an explicit user-provided max-old-space-size when present.
+if ($env:NODE_OPTIONS -notmatch '--max-old-space-size=') {
+    $env:NODE_OPTIONS = (($env:NODE_OPTIONS + ' --max-old-space-size=8192').Trim())
+}
+
+# 5. Start Server
 Write-Host "[*] Starting MCP Server..." -ForegroundColor Green
+Write-Host "[*] NODE_OPTIONS: $env:NODE_OPTIONS" -ForegroundColor DarkGray
 npx tsx src/server.ts

@@ -63,6 +63,18 @@ legacy 연결은 `Mcp-Session-Id`를 세션 키로 사용한다. 세션 초기�
 
 modern 요청에서 `x-openai-session`이 있으면 해당 값을 key로 세션별 MCP server/tool 집합과 `WorkspaceManager`를 재사용한다.
 
+장시간 실행되는 Gateway에서 세션 handler가 무한히 누적되지 않도록 retained modern session에는 수명 정책을 적용한다.
+
+- 기본 idle TTL: 6시간 (`MCP_MODERN_SESSION_RETENTION_MS=21600000`)
+- 기본 최대 retained session: 16개 (`MCP_MAX_MODERN_SESSIONS=16`)
+- TTL이 지난 idle session은 다음 modern 요청 시 `handler.close()` 후 제거한다.
+- 최대 개수에 도달하면 가장 오래 idle인 session부터 정리한다.
+- 현재 요청을 처리 중인 session은 TTL/capacity 정리 대상에서 제외한다.
+- 모든 retained session이 처리 중이라면 기존 session을 강제로 닫지 않고 새 요청은 stateless modern handler로 fallback한다.
+- 동일 `x-openai-session`의 동시 요청은 session acquisition 단계에서 active reservation을 잡아 capacity 정리와의 race를 피한다.
+
+이 정책 때문에 장시간 유휴 후 다시 연결된 채팅은 세션별 active workspace 상태가 초기값으로 돌아갈 수 있다. 이는 무제한 메모리 보존보다 안전성을 우선한 의도된 동작이다.
+
 `x-openai-session`이 없는 일반 modern MCP client는 기존 stateless 동작을 유지한다. OpenAI 전용 헤더가 없는 client에 임의의 세션 의미를 부여하지 않는다.
 
 ## 적용 범위
@@ -94,9 +106,12 @@ Remote MCP Provider의 연결/Registry는 Workspace 선택과 별개의 Gateway 
 2. 두 modern OpenAI 세션이 서로 다른 active workspace를 유지한다.
 3. 각 세션의 파일 목록 조회가 자신의 Workspace를 기준으로 동작한다.
 4. 각 세션의 `exec_command`가 자신의 Workspace를 cwd로 사용한다.
-5. 기존 MCP protocol compatibility가 유지된다.
+5. retained modern session이 설정된 최대 개수를 넘지 않는다.
+6. idle TTL이 지난 modern session이 다음 요청에서 정리된다.
+7. `/health`에서 modern session limit/TTL과 Node memory 진단값을 확인할 수 있다.
+8. 기존 MCP protocol compatibility가 유지된다.
 
-현재 구현 완료 시점 기준 전체 테스트는 10 files / 32 tests를 통과했다.
+2026-09-08 OOM 방어 수정 기준 전체 테스트는 17 files / 58 tests를 통과했다.
 
 실제 ChatGPT에서도 서로 다른 두 채팅에서 각각 `ec`, `wsr`을 선택한 뒤 다시 조회하여 Workspace 상태가 서로 전파되지 않는 것을 확인했다.
 

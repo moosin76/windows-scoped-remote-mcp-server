@@ -225,4 +225,154 @@ describe("session-scoped workspace", () => {
     }
   });
 
+  it("caps retained modern OpenAI sessions and exposes memory diagnostics", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wsr-modern-cap-"));
+    cleanup.push(root);
+    const alpha = path.join(root, "alpha");
+
+    const config = loadConfig(
+      {
+        MCP_ALLOW_NO_AUTH: "true",
+        MCP_OAUTH_ENABLED: "false",
+        MCP_WORKSPACE_ROOT: alpha,
+        MCP_WORKSPACE_ROOTS: `alpha:${alpha}`,
+      },
+      root,
+    );
+    config.host = "127.0.0.1";
+    config.port = 0;
+    config.maxModernSessions = 2;
+    config.modernSessionRetentionMs = 60_000;
+
+    const workspaceManager = new WorkspaceManager(config.workspaceRoots);
+    const sandbox = new SandboxGuard(workspaceManager);
+    const fileService = new FileService({
+      sandbox,
+      maxChunkBytes: config.maxFileChunkBytes,
+      maxEditFileBytes: config.maxEditFileBytes,
+      maxOutputBytes: config.maxOutputBytes,
+    });
+    const processManager = new ProcessManager({
+      maxProcesses: config.maxProcesses,
+      maxRetainedOutputBytes: config.maxRetainedProcessOutputBytes,
+      processRetentionMs: config.processRetentionMs,
+      defaultMaxOutputBytes: config.maxOutputBytes,
+    });
+    const running = await startHttpServer(
+      config,
+      processManager,
+      fileService,
+      workspaceManager,
+      undefined,
+      new ProviderRegistry(),
+    );
+
+    const address = running.httpServer.address() as AddressInfo;
+    const endpoint = new URL(`http://127.0.0.1:${address.port}/mcp`);
+    const healthUrl = new URL(`http://127.0.0.1:${address.port}/health`);
+    const modernOptions = {
+      versionNegotiation: { mode: { pin: "2026-07-28" as const } },
+    };
+    const clients: Client[] = [];
+
+    try {
+      for (const sessionId of ["cap-a", "cap-b", "cap-c"]) {
+        const client = new Client({ name: sessionId, version: "1.0.0" }, modernOptions);
+        clients.push(client);
+        await client.connect(
+          new StreamableHTTPClientTransport(endpoint, {
+            requestInit: { headers: { "x-openai-session": sessionId } },
+          }),
+        );
+        await client.close();
+      }
+
+      const health = await fetch(healthUrl).then((response) => response.json()) as any;
+      expect(health.modernMcpSessions).toBe(2);
+      expect(health.modernMcpSessionLimit).toBe(2);
+      expect(health.modernMcpSessionRetentionMs).toBe(60_000);
+      expect(health.memory.heapUsedBytes).toBeGreaterThan(0);
+      expect(health.memory.heapTotalBytes).toBeGreaterThan(0);
+      expect(health.memory.rssBytes).toBeGreaterThan(0);
+    } finally {
+      await Promise.all(clients.map((client) => client.close().catch(() => undefined)));
+      await running.close();
+    }
+  });
+
+  it("expires idle modern OpenAI sessions on the next request", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wsr-modern-ttl-"));
+    cleanup.push(root);
+    const alpha = path.join(root, "alpha");
+
+    const config = loadConfig(
+      {
+        MCP_ALLOW_NO_AUTH: "true",
+        MCP_OAUTH_ENABLED: "false",
+        MCP_WORKSPACE_ROOT: alpha,
+        MCP_WORKSPACE_ROOTS: `alpha:${alpha}`,
+      },
+      root,
+    );
+    config.host = "127.0.0.1";
+    config.port = 0;
+    config.maxModernSessions = 16;
+    config.modernSessionRetentionMs = 1;
+
+    const workspaceManager = new WorkspaceManager(config.workspaceRoots);
+    const sandbox = new SandboxGuard(workspaceManager);
+    const fileService = new FileService({
+      sandbox,
+      maxChunkBytes: config.maxFileChunkBytes,
+      maxEditFileBytes: config.maxEditFileBytes,
+      maxOutputBytes: config.maxOutputBytes,
+    });
+    const processManager = new ProcessManager({
+      maxProcesses: config.maxProcesses,
+      maxRetainedOutputBytes: config.maxRetainedProcessOutputBytes,
+      processRetentionMs: config.processRetentionMs,
+      defaultMaxOutputBytes: config.maxOutputBytes,
+    });
+    const running = await startHttpServer(
+      config,
+      processManager,
+      fileService,
+      workspaceManager,
+      undefined,
+      new ProviderRegistry(),
+    );
+
+    const address = running.httpServer.address() as AddressInfo;
+    const endpoint = new URL(`http://127.0.0.1:${address.port}/mcp`);
+    const healthUrl = new URL(`http://127.0.0.1:${address.port}/health`);
+    const modernOptions = {
+      versionNegotiation: { mode: { pin: "2026-07-28" as const } },
+    };
+    const clientA = new Client({ name: "ttl-a", version: "1.0.0" }, modernOptions);
+    const clientB = new Client({ name: "ttl-b", version: "1.0.0" }, modernOptions);
+
+    try {
+      await clientA.connect(
+        new StreamableHTTPClientTransport(endpoint, {
+          requestInit: { headers: { "x-openai-session": "ttl-a" } },
+        }),
+      );
+      await clientA.close();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      await clientB.connect(
+        new StreamableHTTPClientTransport(endpoint, {
+          requestInit: { headers: { "x-openai-session": "ttl-b" } },
+        }),
+      );
+
+      const health = await fetch(healthUrl).then((response) => response.json()) as any;
+      expect(health.modernMcpSessions).toBe(1);
+    } finally {
+      await clientA.close().catch(() => undefined);
+      await clientB.close().catch(() => undefined);
+      await running.close();
+    }
+  });
+
 });

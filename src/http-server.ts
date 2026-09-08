@@ -44,6 +44,9 @@ interface ModernMcpSession {
   handler: McpHttpHandler;
   handleRequest: ReturnType<typeof toNodeHandler>;
   workspaceManager: WorkspaceManager;
+  createdAt: number;
+  lastSeenAt: number;
+  activeRequests: number;
 }
 
 type ToolListChangedHandler = Pick<McpHttpHandler, "notify">;
@@ -148,10 +151,81 @@ export async function startHttpServer(
     return { server, workspaceManager: sessionWorkspaceManager };
   };
 
-  const getModernSession = (openAiSessionId: string): ModernMcpSession | undefined => {
+  const closeModernSession = async (
+    openAiSessionId: string,
+    reason: "expired" | "capacity" | "shutdown",
+  ): Promise<boolean> => {
+    const session = modernSessions.get(openAiSessionId);
+    if (!session || session.activeRequests > 0) {
+      return false;
+    }
+
+    modernSessions.delete(openAiSessionId);
+    await session.handler.close().catch(() => {});
+    console.log(`[MCP Modern Session] Closed reason=${reason}`);
+    return true;
+  };
+
+  const pruneExpiredModernSessions = async (now = Date.now()): Promise<void> => {
+    const expired = Array.from(modernSessions.entries())
+      .filter(([, session]) =>
+        session.activeRequests === 0 &&
+        now - session.lastSeenAt > config.modernSessionRetentionMs
+      )
+      .sort(([, a], [, b]) => a.lastSeenAt - b.lastSeenAt);
+
+    for (const [openAiSessionId] of expired) {
+      await closeModernSession(openAiSessionId, "expired");
+    }
+  };
+
+  const makeModernSessionCapacity = async (): Promise<void> => {
+    if (modernSessions.size < config.maxModernSessions) {
+      return;
+    }
+
+    const idleByAge = Array.from(modernSessions.entries())
+      .filter(([, session]) => session.activeRequests === 0)
+      .sort(([, a], [, b]) => a.lastSeenAt - b.lastSeenAt);
+
+    for (const [openAiSessionId] of idleByAge) {
+      if (modernSessions.size < config.maxModernSessions) {
+        break;
+      }
+      await closeModernSession(openAiSessionId, "capacity");
+    }
+  };
+
+  const getModernSession = async (
+    openAiSessionId: string,
+  ): Promise<ModernMcpSession | undefined> => {
+    await pruneExpiredModernSessions();
+
     const existing = modernSessions.get(openAiSessionId);
-    if (existing) return existing;
+    if (existing) {
+      existing.lastSeenAt = Date.now();
+      existing.activeRequests += 1;
+      return existing;
+    }
     if (!workspaceManager) return undefined;
+
+    await makeModernSessionCapacity();
+
+    // Another concurrent request for the same OpenAI session may have created
+    // the retained handler while this request was awaiting capacity cleanup.
+    const racedExisting = modernSessions.get(openAiSessionId);
+    if (racedExisting) {
+      racedExisting.lastSeenAt = Date.now();
+      racedExisting.activeRequests += 1;
+      return racedExisting;
+    }
+
+    if (modernSessions.size >= config.maxModernSessions) {
+      console.warn(
+        `[MCP Modern Session] Capacity ${config.maxModernSessions} reached with all retained sessions active; using stateless fallback`,
+      );
+      return undefined;
+    }
 
     const sessionWorkspaceManager = workspaceManager.fork();
     const sessionSandbox = new SandboxGuard(sessionWorkspaceManager);
@@ -175,10 +249,18 @@ export async function startHttpServer(
         console.error("[MCP Adapter Error]", errorMessage(error));
       },
     });
-    const session = { handler, handleRequest, workspaceManager: sessionWorkspaceManager };
+    const now = Date.now();
+    const session: ModernMcpSession = {
+      handler,
+      handleRequest,
+      workspaceManager: sessionWorkspaceManager,
+      createdAt: now,
+      lastSeenAt: now,
+      activeRequests: 1,
+    };
     modernSessions.set(openAiSessionId, session);
     console.log(
-      `[MCP Modern Session] Initialized workspace=${sessionWorkspaceManager.getActiveWorkspace().name}`,
+      `[MCP Modern Session] Initialized workspace=${sessionWorkspaceManager.getActiveWorkspace().name} retained=${modernSessions.size}/${config.maxModernSessions}`,
     );
     return session;
   };
@@ -408,6 +490,7 @@ export async function startHttpServer(
       name: "default",
       path: config.workspaceRoot,
     };
+    const memory = process.memoryUsage();
     res.json({
       status: "ok",
       name: "windows-scoped-remote-mcp",
@@ -419,6 +502,15 @@ export async function startHttpServer(
       activeMcpSessions: legacySessions.size + modernSessions.size,
       legacyMcpSessions: legacySessions.size,
       modernMcpSessions: modernSessions.size,
+      modernMcpSessionLimit: config.maxModernSessions,
+      modernMcpSessionRetentionMs: config.modernSessionRetentionMs,
+      memory: {
+        rssBytes: memory.rss,
+        heapUsedBytes: memory.heapUsed,
+        heapTotalBytes: memory.heapTotal,
+        externalBytes: memory.external,
+        arrayBuffersBytes: memory.arrayBuffers,
+      },
       allWorkspaces: workspaceManager?.getAllWorkspaces() || [
         { name: "default", path: config.workspaceRoot, isActive: true },
       ],
@@ -500,9 +592,14 @@ export async function startHttpServer(
         }
 
         if (openAiSessionId) {
-          const modernSession = getModernSession(openAiSessionId);
+          const modernSession = await getModernSession(openAiSessionId);
           if (modernSession) {
-            await modernSession.handleRequest(req, res, req.body);
+            try {
+              await modernSession.handleRequest(req, res, req.body);
+            } finally {
+              modernSession.activeRequests = Math.max(0, modernSession.activeRequests - 1);
+              modernSession.lastSeenAt = Date.now();
+            }
             return;
           }
         }

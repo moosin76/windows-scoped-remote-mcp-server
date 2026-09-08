@@ -59,8 +59,14 @@ if exist "bin\cloudflared.exe" (
     "bin\cloudflared.exe" version
 )
 
-:: 5. Run Server using tsx dev mode
+:: 5. Give the long-running WSR process extra V8 heap headroom.
+:: Respect an explicit user-provided max-old-space-size when present.
+echo %NODE_OPTIONS% | findstr /C:"--max-old-space-size=" >nul
+if errorlevel 1 set "NODE_OPTIONS=%NODE_OPTIONS% --max-old-space-size=8192"
+
+:: 6. Run Server using tsx dev mode
 echo [*] Starting MCP Server...
+echo [*] NODE_OPTIONS: %NODE_OPTIONS%
 call npx tsx src/server.ts
 
 pause

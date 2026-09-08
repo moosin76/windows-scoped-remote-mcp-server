@@ -32,6 +32,8 @@ export interface AppConfig {
   maxRetainedProcessOutputBytes: number;
   processRetentionMs: number;
   maxProcesses: number;
+  modernSessionRetentionMs: number;
+  maxModernSessions: number;
   maxFileChunkBytes: number;
   maxEditFileBytes: number;
   browserHeadless: boolean;
@@ -205,6 +207,19 @@ export function loadConfig(
     ),
     processRetentionMs: parseInteger(env.MCP_PROCESS_RETENTION_MS, 60 * 60 * 1000, "MCP_PROCESS_RETENTION_MS", 1000),
     maxProcesses: parseInteger(env.MCP_MAX_PROCESSES, 128, "MCP_MAX_PROCESSES", 1),
+    modernSessionRetentionMs: parseInteger(
+      env.MCP_MODERN_SESSION_RETENTION_MS,
+      6 * 60 * 60 * 1000,
+      "MCP_MODERN_SESSION_RETENTION_MS",
+      60 * 1000,
+    ),
+    maxModernSessions: parseInteger(
+      env.MCP_MAX_MODERN_SESSIONS,
+      16,
+      "MCP_MAX_MODERN_SESSIONS",
+      1,
+      1024,
+    ),
     maxFileChunkBytes: parseInteger(env.MCP_MAX_FILE_CHUNK_BYTES, 4 * 1024 * 1024, "MCP_MAX_FILE_CHUNK_BYTES", 4096),
     maxEditFileBytes: parseInteger(env.MCP_MAX_EDIT_FILE_BYTES, 128 * 1024 * 1024, "MCP_MAX_EDIT_FILE_BYTES", 4096),
     browserHeadless: parseBoolean(env.MCP_BROWSER_HEADLESS, false),
