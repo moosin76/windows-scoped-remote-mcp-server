@@ -4,6 +4,7 @@ import { ProviderRegistry } from "../src/providers/provider-registry.js";
 import {
   registerProviderCallTool,
   registerProviderCatalogTool,
+  registerProviderStatusTool,
   registerProviderTools,
 } from "../src/providers/provider-tools.js";
 import type { McpProvider } from "../src/providers/mcp-provider.js";
@@ -114,6 +115,67 @@ describe("registerProviderTools", () => {
 });
 
 describe("provider discovery fallback tools", () => {
+  it("uses mcp_provider_status as a stable control-plane fallback", async () => {
+    const { provider, callTool } = fakeProvider({
+      name: "Snapshot",
+      description: "Inspect the desktop",
+      inputSchema: { type: "object" },
+    });
+    const registry = new ProviderRegistry();
+    registry.add(provider);
+    await registry.refresh("fake");
+
+    const registered: Registered[] = [];
+    registerProviderStatusTool(fakeServer(registered) as never, registry);
+
+    expect(registered).toHaveLength(1);
+    expect(registered[0].name).toBe("mcp_provider_status");
+    expect(registered[0].config.description).toContain("control-plane fallback");
+    expect(registered[0].config.description).toContain("catalog");
+    expect(registered[0].config.description).toContain("call");
+
+    const status = await registered[0].callback({});
+    expect(status.structuredContent.providers[0]).toMatchObject({
+      id: "fake",
+      connected: true,
+      toolCount: 1,
+    });
+    expect(status.structuredContent.providers[0].tools).toBeUndefined();
+
+    const catalog = await registered[0].callback({ op: "catalog" });
+    expect(catalog.structuredContent.providers[0].tools).toEqual([
+      {
+        name: "fake_Snapshot",
+        remoteName: "Snapshot",
+        description: "Inspect the desktop",
+      },
+    ]);
+
+    const called = await registered[0].callback({
+      op: "call",
+      tool: "fake_Snapshot",
+      arguments: { display: 0 },
+    });
+    expect(called).toMatchObject({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: {
+        providerId: "fake",
+        tool: "fake_Snapshot",
+        result: null,
+      },
+    });
+    expect(callTool).toHaveBeenCalledWith("Snapshot", { display: 0 });
+
+    const rejected = await registered[0].callback({
+      op: "call",
+      tool: "fake_HiddenPowerShell",
+      arguments: {},
+    });
+    expect(rejected.isError).toBe(true);
+    expect(rejected.content[0].text).toContain("not in the discovered/allowed");
+    expect(callTool).toHaveBeenCalledTimes(1);
+  });
+
   it("catalogs discovered provider tools with names and descriptions", async () => {
     const { provider } = fakeProvider({
       name: "Snapshot",

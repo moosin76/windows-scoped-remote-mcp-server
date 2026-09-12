@@ -153,11 +153,113 @@ export function registerProviderStatusTool(
     "mcp_provider_status",
     {
       description:
-        "Show the connection status of configured remote MCP providers. Use this when a provider-specific tool is unavailable.",
-      outputSchema: z.object({ providers: z.array(z.record(z.string(), z.unknown())) }),
+        "Stable MCP provider control-plane fallback. With no arguments (or op='status'), show provider connection status. Use op='catalog' to list the actual discovered/allowed provider tools, or op='call' with a namespaced tool name to invoke one of those discovered tools. Use this when mcp_provider_catalog, mcp_provider_call, or a provider-specific tool is not visible in client tool discovery/search.",
+      inputSchema: {
+        op: z.enum(["status", "catalog", "call"]).optional(),
+        tool: z.string().min(1).optional(),
+        arguments: z.record(z.string(), z.unknown()).optional(),
+      },
+      outputSchema: z.object({
+        providers: z.array(z.record(z.string(), z.unknown())).optional(),
+        providerId: z.string().optional(),
+        tool: z.string().optional(),
+        result: z.unknown().optional(),
+      }),
     },
-    async () => {
-      const providers = registry.listStatuses();
+    async ({
+      op = "status",
+      tool,
+      arguments: args,
+    }: {
+      op?: "status" | "catalog" | "call";
+      tool?: string;
+      arguments?: Record<string, unknown>;
+    }) => {
+      if (op === "call") {
+        if (!tool) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "mcp_provider_status op='call' requires a namespaced 'tool' name. Use op='catalog' first if needed.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const entry = registry
+          .listCachedTools()
+          .find((candidate) => candidate.tool.name === tool);
+        if (!entry) {
+          const available = registry
+            .listCachedTools()
+            .map((candidate) => candidate.tool.name);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `Provider tool '${tool}' is not in the discovered/allowed tool snapshot. ` +
+                  `Use mcp_provider_status with op='catalog' to inspect available tools. ` +
+                  `Available: ${available.join(", ")}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const provider = registry.get(entry.providerId);
+        if (!provider) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `MCP provider '${entry.providerId}' is no longer registered.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          const result = await provider.callTool(entry.remoteName, args ?? {});
+          return {
+            ...result,
+            structuredContent: {
+              providerId: entry.providerId,
+              tool: entry.tool.name,
+              result: result.structuredContent ?? null,
+            },
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: error instanceof Error ? error.message : String(error),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      const cachedTools = registry.listCachedTools();
+      const providers = registry.listStatuses().map((status) =>
+        op === "catalog"
+          ? {
+              ...status,
+              tools: cachedTools
+                .filter((entry) => entry.providerId === status.id)
+                .map((entry) => ({
+                  name: entry.tool.name,
+                  remoteName: entry.remoteName,
+                  description: entry.tool.description ?? "",
+                })),
+            }
+          : status,
+      );
       return {
         content: [{ type: "text" as const, text: JSON.stringify(providers, null, 2) }],
         structuredContent: { providers },
