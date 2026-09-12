@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ProviderRegistry } from "../src/providers/provider-registry.js";
 import type { McpProvider } from "../src/providers/mcp-provider.js";
 import type { Tool } from "@modelcontextprotocol/server";
@@ -76,6 +79,45 @@ describe("ProviderRegistry", () => {
         toolCount: 0,
       },
     ]);
+  });
+
+  it("restores cached provider tool schemas while the provider is unavailable", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wsr-provider-cache-"));
+    const cachePath = join(dir, "provider-tools.json");
+    try {
+      const first = new ProviderRegistry({ snapshotCachePath: cachePath });
+      first.add(fakeProvider("blender", "blender", ["get_scene_info", "execute_code"]));
+      await first.refresh("blender");
+      expect(first.listCachedTools().map((item) => item.tool.name)).toEqual([
+        "blender_get_scene_info",
+        "blender_execute_code",
+      ]);
+
+      const second = new ProviderRegistry({ snapshotCachePath: cachePath });
+      const unavailable = fakeProvider("blender", "blender", []);
+      unavailable.connect = async () => {
+        throw new Error("Blender is not running");
+      };
+      unavailable.isConnected = () => false;
+      second.add(unavailable);
+
+      expect(second.listCachedTools().map((item) => item.tool.name)).toEqual([
+        "blender_get_scene_info",
+        "blender_execute_code",
+      ]);
+      expect(second.listStatuses()).toEqual([
+        {
+          id: "blender",
+          namespace: "blender",
+          connected: false,
+          toolCount: 2,
+        },
+      ]);
+      await expect(second.connectAll()).resolves.toBeUndefined();
+      expect(second.listCachedTools()).toHaveLength(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("rediscovers a provider that becomes available later", async () => {

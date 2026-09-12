@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import type { Tool } from "@modelcontextprotocol/server";
 import type { McpProvider } from "./mcp-provider.js";
 
@@ -16,11 +18,27 @@ export interface ProviderStatus {
 }
 
 /** Registry for remote MCP providers and their namespaced tools. */
+export interface ProviderRegistryOptions {
+  snapshotCachePath?: string;
+}
+
+interface PersistedProviderToolSnapshot {
+  version: 1;
+  providers: Record<string, readonly NamespacedTool[]>;
+}
+
 export class ProviderRegistry {
   private readonly providers = new Map<string, McpProvider>();
   private readonly toolSnapshots = new Map<string, readonly NamespacedTool[]>();
   private readonly lastDiscoveryAttempt = new Map<string, number>();
   private readonly discoveryRetryMs = 5_000;
+  private readonly snapshotCachePath?: string;
+  private readonly persistedSnapshots = new Map<string, readonly NamespacedTool[]>();
+
+  constructor(options: ProviderRegistryOptions = {}) {
+    this.snapshotCachePath = options.snapshotCachePath;
+    this.loadPersistedSnapshots();
+  }
 
   add(provider: McpProvider): void {
     if (this.providers.has(provider.id)) {
@@ -36,6 +54,17 @@ export class ProviderRegistry {
       );
     }
     this.providers.set(provider.id, provider);
+    const cached = this.persistedSnapshots.get(provider.id);
+    if (cached?.length) {
+      const prefix = `${provider.namespace}_`;
+      const compatible = cached.filter((entry) =>
+        entry.providerId === provider.id &&
+        entry.tool.name.startsWith(prefix),
+      );
+      if (compatible.length) {
+        this.toolSnapshots.set(provider.id, Object.freeze(compatible.slice()));
+      }
+    }
   }
 
   remove(id: string): McpProvider | undefined {
@@ -121,6 +150,8 @@ export class ProviderRegistry {
 
     const snapshot = Object.freeze(result.slice());
     this.toolSnapshots.set(id, snapshot);
+    this.persistedSnapshots.set(id, snapshot);
+    this.persistSnapshots();
     return snapshot;
   }
 
@@ -146,6 +177,61 @@ export class ProviderRegistry {
       toolCount: this.toolSnapshots.get(provider.id)?.length ?? 0,
       ...(provider.lastError ? { lastError: provider.lastError } : {}),
     }));
+  }
+
+  private loadPersistedSnapshots(): void {
+    if (!this.snapshotCachePath || !existsSync(this.snapshotCachePath)) return;
+    try {
+      const parsed = JSON.parse(
+        readFileSync(this.snapshotCachePath, "utf8"),
+      ) as PersistedProviderToolSnapshot;
+      if (parsed.version !== 1 || !parsed.providers || typeof parsed.providers !== "object") {
+        return;
+      }
+      for (const [providerId, entries] of Object.entries(parsed.providers)) {
+        if (!Array.isArray(entries)) continue;
+        const valid = entries.filter((entry): entry is NamespacedTool =>
+          !!entry &&
+          typeof entry.providerId === "string" &&
+          typeof entry.remoteName === "string" &&
+          !!entry.tool &&
+          typeof entry.tool.name === "string",
+        );
+        if (valid.length) {
+          this.persistedSnapshots.set(providerId, Object.freeze(valid.slice()));
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[MCP Provider] Could not read tool snapshot cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private persistSnapshots(): void {
+    if (!this.snapshotCachePath) return;
+    try {
+      mkdirSync(dirname(this.snapshotCachePath), { recursive: true });
+      const providers = Object.fromEntries(
+        [...this.persistedSnapshots.entries()].map(([id, entries]) => [
+          id,
+          entries,
+        ]),
+      );
+      const payload: PersistedProviderToolSnapshot = {
+        version: 1,
+        providers,
+      };
+      writeFileSync(
+        this.snapshotCachePath,
+        JSON.stringify(payload, null, 2) + "\n",
+        "utf8",
+      );
+    } catch (error) {
+      console.warn(
+        `[MCP Provider] Could not persist tool snapshot cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   resolve(namespacedName: string): {

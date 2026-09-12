@@ -14,6 +14,7 @@ dist/
 
 # OAuth State & Dynamic Tokens
 .mcp-oauth-state.json
+.mcp-provider-tools-cache.json
 *.tmp
 *.tmp.*
 
