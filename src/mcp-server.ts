@@ -14,6 +14,8 @@ import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
 import {
+  registerProviderCallTool,
+  registerProviderCatalogTool,
   registerProviderStatusTool,
   registerProviderTools,
 } from "./providers/provider-tools.js";
@@ -34,7 +36,7 @@ export async function createMcpServer(
     },
     {
       instructions:
-        "This server is a Windows remote development environment with multi-root workspace support and Playwright browser automation. The active workspace has read/write access. Other registered workspaces are read-only references and can be listed, read, searched, analyzed, and copied into the active workspace; they cannot be modified through cross-workspace tools.",
+        "This server is a Windows remote development environment with multi-root workspace support and Playwright browser automation. The active workspace has read/write access. Other registered workspaces are read-only references and can be listed, read, searched, analyzed, and copied into the active workspace; they cannot be modified through cross-workspace tools. Optional MCP providers can expose Godot, Blender, Windows-MCP desktop UI automation, PostgreSQL, and other namespaced tools. If a provider-specific tool is not visible in client tool search, use mcp_provider_status to check connectivity, mcp_provider_catalog to list the actual discovered provider tools, and mcp_provider_call as a fallback to invoke an allowed discovered provider tool by namespaced name.",
       capabilities: { tools: {}, prompts: {}, logging: {} },
     },
   );
@@ -59,6 +61,8 @@ export async function createMcpServer(
   if (providerRegistry) {
     await providerRegistry.discoverAvailable();
     registerProviderStatusTool(server, providerRegistry);
+    registerProviderCatalogTool(server, providerRegistry);
+    registerProviderCallTool(server, providerRegistry);
     registerProviderTools(
       server,
       providerRegistry,

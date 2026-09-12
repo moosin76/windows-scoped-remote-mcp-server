@@ -163,6 +163,30 @@ Windows-MCP를 먼저 사용해 마우스로 Blender를 모델링하는 방식�
   - 원본 desktop size `3840x2160`
   - Windows-MCP가 좌표 변환용 screenshot scale metadata를 반환하는 것 확인
 
+## Provider Tool Discovery 복구 경로
+
+일부 MCP 클라이언트는 WSR이 동적으로 proxy 등록한 provider tool을 자체 검색/필터 단계에서 바로 노출하지 못할 수 있다. Provider 연결 자체가 정상인데 `windows_Snapshot` 같은 tool이 검색되지 않는 경우를 위해 WSR은 정적 진단/호출 경로를 제공한다.
+
+- `mcp_provider_status`: provider 연결 여부와 tool count 확인
+- `mcp_provider_catalog`: 현재 Registry snapshot에 실제 등록된 namespaced provider tool 이름/설명 조회
+- `mcp_provider_call`: catalog에 존재하는 provider tool을 namespaced name으로 호출하는 fallback
+
+`mcp_provider_call`은 Registry snapshot에 없는 이름을 거부하므로 Windows-MCP의 `MCP_WINDOWS_TOOLS` allowlist를 우회하지 않는다. 또한 동적 proxy tool description에는 provider id prefix를 붙여 `windows`, `blender`, `godot`, `postgresql` 같은 provider 키워드로 클라이언트 검색에 더 잘 걸리도록 한다.
+
+권장 복구 순서:
+
+```text
+provider-specific tool 검색 실패
+  ↓
+mcp_provider_status
+  ↓
+mcp_provider_catalog
+  ↓
+직접 provider tool 호출 가능하면 해당 tool 사용
+  ↓
+계속 노출되지 않으면 mcp_provider_call fallback
+```
+
 ## 보안 원칙
 
 Windows Computer Use는 현재 로그인된 사용자 데스크톱을 실제로 조작한다. 따라서 다음 원칙을 유지한다.
