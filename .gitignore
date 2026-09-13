@@ -49,3 +49,7 @@ Thumbs.db
 *.sw?
 
 tmp_docs/
+# WSR / MCP local scratch artifacts
+/tmp/
+/.mcp_tmp_scripts/
+/nul

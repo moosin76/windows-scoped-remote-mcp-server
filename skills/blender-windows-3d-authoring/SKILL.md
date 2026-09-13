@@ -483,6 +483,19 @@ Right depth/height aspect ≈ 0.443
 
 숫자는 특정 상품 기준이므로 공용 skill의 acceptance threshold로 하드코딩하지 않는다.
 
+### 상품 reference 이미지 역할 분리
+
+의류 상품 이미지를 사용할 때 **단품(flat lay / ghost / 펼침) 이미지와 착용(worn) 이미지를 같은 authority로 취급하지 않는다.**
+
+```text
+공식 실측값 = canonical geometry의 치수 authority
+단품 이미지 = neckline, sleeve opening, hem, seam/trim 같은 디자인 형태 참고
+착용 이미지 = shoulder drop, armhole/underarm wrap, upper-arm fit, waist taper, drape silhouette 참고
+reference mannequin = 실제 현재 body와의 공간 관계/곡률 검증
+```
+
+특히 단품 이미지의 전체 W/H나 행별 폭 비율을 그대로 착용 실루엣 목표값으로 사용하지 않는다. 펼쳐놓은 garment와 body에 착용된 garment는 중력, 체형, 포즈, 원단 신축 때문에 화면 비율이 달라진다.
+
 ### Canonical model과 fit simulation 분리
 
 Body를 construction reference로 사용하는 경우에도 canonical object를 body surface에 억지로 projection하여 모든 penetration을 제거하지 않는다.
@@ -520,3 +533,81 @@ Sleeve root: armhole boundaries + underarm arc를 그대로 재사용
 ```
 
 이 방식으로 torso side의 이웃 edge-length ratio max가 약 1.054로 유지됐고, 실제 mesh-surface 기준 torso/upper gap은 0.01mm 미만까지 수렴했다. 이 수치는 특정 모델의 acceptance threshold가 아니라, `continuous surface` 구조가 실제로 seam-snap 방식보다 안정적이었다는 작업 기록이다.
+
+## OpenCV 기반 영상 멀티뷰 프레임 선택
+
+DrapeFit/GAS처럼 회전 영상에서 정면/측면/후면 멀티뷰를 추출할 때는 단순히 영상을 4등분하지 않는다. 생성형 비디오 모델은 회전 속도가 비선형일 수 있으므로 실제 프레임 실루엣을 분석해 각도를 잡는다.
+
+현재 개발 PC에서 검증된 실행 환경:
+
+```text
+OpenCV root: C:\opencv
+OpenCV DLL: C:\opencv\build\x64\vc16\bin
+OpenCV Python package: C:\opencv\build\python
+ComfyUI embedded Python: C:\ComfyUI-Easy-Install\ComfyUI\python_embeded\python.exe
+Python: 3.12.10
+NumPy: 1.26.4
+cv2: 5.0.0
+```
+
+확인 명령 예:
+
+```powershell
+$py='C:\ComfyUI-Easy-Install\ComfyUI\python_embeded\python.exe'
+$env:PATH='C:\opencv\build\x64\vc16\bin;' + $env:PATH
+$env:PYTHONPATH='C:\opencv\build\python'
+& $py -c "import cv2, numpy; print(cv2.__version__); print(numpy.__version__)"
+```
+
+현재 ComfyUI embedded Python에는 `cv2 5.0.0`과 `numpy 1.26.4`가 이미 정상 import 되므로, 가능하면 이 환경을 우선 재사용한다. 시스템 기본 Python은 버전이나 NumPy 설치 상태가 맞지 않을 수 있으므로 무조건 사용하지 않는다.
+
+### 회전 영상 각도 탐색 원칙
+
+배경과 대상 의상의 색/채도 차이를 이용해 프레임별 garment silhouette을 추출하고 bounding box 폭을 계산한다.
+
+```text
+정면/후면 후보 = silhouette 폭이 큰 구간
+좌/우 측면 후보 = silhouette 폭이 작은 구간
+```
+
+단, 최종 각도는 폭 extrema만으로 확정하지 않는다. 각 extrema 주변 `±3~5` 프레임을 후보로 뽑아 Vision/육안으로 정확한 정면·측면·후면 여부를 확인한다.
+
+권장 순서:
+
+```text
+video decode
+→ HSV/채도 기반 garment mask
+→ morphology open/close
+→ largest connected component
+→ per-frame bounding box width/height/area
+→ extrema 주변 후보 추출
+→ Vision/육안 검증
+→ 최종 0/90/180/270 저장
+→ candidate/contact-sheet/임시 script 삭제
+```
+
+OpenCV는 각도를 완전히 자동 판정하는 권위가 아니라 **후보 위치를 빠르게 좁히는 정량 도구**로 사용한다. 생성형 영상은 자세/실루엣이 미세하게 morph될 수 있으므로 최종 선택은 시각 검증을 통과해야 한다.
+
+### 업스케일 전 원칙
+
+멀티뷰 재구성 입력은 먼저 원본 프레임의 시점 일관성과 silhouette 정확성을 확정한 뒤 업스케일한다. 업스케일은 형상 보존이 최우선이다.
+
+우선순위:
+
+```text
+비생성형 ESRGAN / RealESRGAN / SwinIR 계열
+→ 필요 시 매우 약한 detail restoration
+→ diffusion 기반 생성형 upscale은 마지막 수단
+```
+
+업스케일 전후에 다음을 비교한다.
+
+- neckline 폭/깊이
+- shoulder width
+- sleeve length/opening
+- side silhouette
+- hem contour
+- logo 위치
+- 전체 garment bounding box 비율
+
+업스케일 후 형태가 바뀌면 원본 프레임을 authoritative reference로 유지하고 해당 업스케일 결과는 폐기한다.
