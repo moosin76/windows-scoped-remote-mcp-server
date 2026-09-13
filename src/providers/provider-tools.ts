@@ -246,20 +246,21 @@ export function registerProviderStatusTool(
       }
 
       const cachedTools = registry.listCachedTools();
-      const providers = registry.listStatuses().map((status) =>
-        op === "catalog"
-          ? {
-              ...status,
-              tools: cachedTools
-                .filter((entry) => entry.providerId === status.id)
-                .map((entry) => ({
-                  name: entry.tool.name,
-                  remoteName: entry.remoteName,
-                  description: entry.tool.description ?? "",
-                })),
-            }
-          : status,
-      );
+      // Always include tool names, even for the no-argument status call. This
+      // deliberately supports clients that cached an older input schema for
+      // mcp_provider_status and therefore cannot send op='catalog'.
+      const providers = registry.listStatuses().map((status) => ({
+        ...status,
+        tools: cachedTools
+          .filter((entry) => entry.providerId === status.id)
+          .map((entry) => ({
+            name: entry.tool.name,
+            remoteName: entry.remoteName,
+            ...(op === "catalog"
+              ? { description: entry.tool.description ?? "" }
+              : {}),
+          })),
+      }));
       return {
         content: [{ type: "text" as const, text: JSON.stringify(providers, null, 2) }],
         structuredContent: { providers },

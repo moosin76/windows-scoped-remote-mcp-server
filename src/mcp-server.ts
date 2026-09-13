@@ -59,15 +59,29 @@ export async function createMcpServer(
   registerExecTools(server, config, processManager, fileService);
   registerFileTools(server, config, fileService);
   if (providerRegistry) {
-    await providerRegistry.discoverAvailable();
+    // Register the stable control-plane and persisted provider schemas before
+    // attempting any live provider discovery. Some MCP clients snapshot the
+    // initial tool list and do not reliably refresh it after tools/list_changed.
+    // Keeping cached schemas in the initial list makes optional providers
+    // discoverable even when Blender/Godot/etc. start slowly or are offline.
     registerProviderStatusTool(server, providerRegistry);
     registerProviderCatalogTool(server, providerRegistry);
     registerProviderCallTool(server, providerRegistry);
-    registerProviderTools(
-      server,
-      providerRegistry,
-      providerRegistry.listCachedTools(),
+    const initiallyRegisteredProviderTools = providerRegistry.listCachedTools();
+    registerProviderTools(server, providerRegistry, initiallyRegisteredProviderTools);
+
+    await providerRegistry.discoverAvailable();
+
+    // First-run recovery: if live discovery found tools that were not in the
+    // persisted snapshot, add only those new names. Existing cached names stay
+    // registered so duplicate registration cannot occur.
+    const initialNames = new Set(
+      initiallyRegisteredProviderTools.map((entry) => entry.tool.name),
     );
+    const newlyDiscoveredTools = providerRegistry
+      .listCachedTools()
+      .filter((entry) => !initialNames.has(entry.tool.name));
+    registerProviderTools(server, providerRegistry, newlyDiscoveredTools);
   }
   return server;
 }

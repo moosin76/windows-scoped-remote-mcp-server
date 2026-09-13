@@ -140,7 +140,12 @@ describe("provider discovery fallback tools", () => {
       connected: true,
       toolCount: 1,
     });
-    expect(status.structuredContent.providers[0].tools).toBeUndefined();
+    expect(status.structuredContent.providers[0].tools).toEqual([
+      {
+        name: "fake_Snapshot",
+        remoteName: "Snapshot",
+      },
+    ]);
 
     const catalog = await registered[0].callback({ op: "catalog" });
     expect(catalog.structuredContent.providers[0].tools).toEqual([
