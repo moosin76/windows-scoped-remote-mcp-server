@@ -337,6 +337,12 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_BROWSER_HEADLESS`            | `false`                     | Playwright Headless 여부               |
 | `MCP_PROVIDER_HEALTH_INTERVAL_MS` | `10000`                     | 연결된 Provider 검사 주기(ms)          |
 | `MCP_PROVIDER_RETRY_INTERVAL_MS`  | `5000`                      | 연결되지 않은 Provider 재연결 주기(ms) |
+| `MCP_NEEDLE_ENABLED`              | `false`                     | Needle 3 Fast Tool Router 활성화       |
+| `MCP_NEEDLE_PYTHON`               | `python`                    | Needle sidecar Python 실행 명령        |
+| `MCP_NEEDLE_CONFIDENCE_THRESHOLD` | `0.70`                      | 추천으로 인정할 최소 confidence       |
+| `MCP_NEEDLE_TOOL_INDEX_PATH`      | `.cache/needle/wsr-tools.idx` | Needle Tool index 기준 경로          |
+| `MCP_NEEDLE_REQUEST_TIMEOUT_MS`   | `60000`                     | Needle 요청 timeout(ms)                |
+| `MCP_NEEDLE_MAX_CATALOG_TOOLS`    | `24`                        | Needle에 전달할 전체 Tool 상한         |
 | `MCP_GODOT_ENABLED`               | `false`                     | Godot MCP Provider 활성화              |
 | `MCP_GODOT_URL`                   | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint                     |
 | `MCP_BLENDER_ENABLED`             | `false`                     | Blender MCP Provider 활성화            |
@@ -346,6 +352,24 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_WINDOWS_ENABLED`             | `false`                     | Windows Computer Use Provider 활성화   |
 | `MCP_WINDOWS_COMMAND`             | `uvx`                       | Windows-MCP stdio 실행 명령            |
 | `MCP_WINDOWS_TOOLS`               | UI allowlist                | WSR에 노출할 Windows-MCP 도구 목록     |
+
+### Needle 3 Fast Tool Router
+
+Needle은 선택 기능이며 기본적으로 비활성화됩니다. 활성화하려면 먼저 로컬 Python에 `cactus-needle`을 설치하고 다음처럼 설정합니다.
+
+```bash
+python -m pip install cactus-needle
+```
+
+```env
+MCP_NEEDLE_ENABLED=true
+MCP_NEEDLE_PYTHON=python
+MCP_NEEDLE_CONFIDENCE_THRESHOLD=0.70
+```
+
+`needle_route`는 Tool을 실행하지 않고 추천만 반환합니다. AI 클라이언트는 사용자의 언어와 관계없이 요청을 짧은 영어 canonical command로 정규화해서 `query`에 넣고, 원문은 필요하면 `originalQuery`로 함께 전달합니다. Workspace alias, 경로, URL, branch, object/schema/table 이름 같은 literal 값은 번역하지 않습니다.
+
+Provider가 명확한 요청은 `scope="providers"`와 `providerId`로 좁히고, Core 요청은 `scope="core"`를 사용합니다. confidence가 threshold 미만이거나 `escalate=true`면 일반 LLM reasoning으로 fallback합니다.
 
 민감한 토큰과 비밀번호는 `.env`에만 저장하고 Git에 커밋하지 마세요.
 

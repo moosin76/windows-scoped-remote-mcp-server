@@ -13,6 +13,8 @@ import { registerBrowserTools } from "./browser-tools.js";
 import type { WorkspaceManager } from "./workspace.js";
 import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
+import type { NeedleRouter } from "./needle/needle-router.js";
+import { registerNeedleRouteTool } from "./needle/needle-tools.js";
 import {
   registerProviderCallTool,
   registerProviderCatalogTool,
@@ -27,6 +29,7 @@ export async function createMcpServer(
   workspaceManager?: WorkspaceManager,
   browserManager?: BrowserManager,
   providerRegistry?: ProviderRegistry,
+  needleRouter?: NeedleRouter,
 ): Promise<McpServer> {
   const server = new McpServer(
     {
@@ -36,7 +39,7 @@ export async function createMcpServer(
     },
     {
       instructions:
-        "This server is a Windows remote development environment with multi-root workspace support and Playwright browser automation. The active workspace has read/write access. Other registered workspaces are read-only references and can be listed, read, searched, analyzed, and copied into the active workspace; they cannot be modified through cross-workspace tools. Optional MCP providers can expose Godot, Blender, Windows-MCP desktop UI automation, PostgreSQL, and other namespaced tools. If a provider-specific tool is not visible in client tool search, use mcp_provider_status. It is the stable control-plane fallback: op='status' checks connectivity, op='catalog' lists the actual discovered provider tools, and op='call' invokes an allowed discovered provider tool by namespaced name. The separate mcp_provider_catalog and mcp_provider_call aliases remain available when the client discovers them.",
+        "This server is a Windows remote development environment with multi-root workspace support and Playwright browser automation. When enabled, needle_route is a local recommendation-only fast router: it proposes tool calls but never executes them. The active workspace has read/write access. Other registered workspaces are read-only references and can be listed, read, searched, analyzed, and copied into the active workspace; they cannot be modified through cross-workspace tools. Optional MCP providers can expose Godot, Blender, Windows-MCP desktop UI automation, PostgreSQL, and other namespaced tools. If a provider-specific tool is not visible in client tool search, use mcp_provider_status. It is the stable control-plane fallback: op='status' checks connectivity, op='catalog' lists the actual discovered provider tools, and op='call' invokes an allowed discovered provider tool by namespaced name. The separate mcp_provider_catalog and mcp_provider_call aliases remain available when the client discovers them.",
       capabilities: { tools: {}, prompts: {}, logging: {} },
     },
   );
@@ -58,6 +61,14 @@ export async function createMcpServer(
   );
   registerExecTools(server, config, processManager, fileService);
   registerFileTools(server, config, fileService);
+  if (config.needleEnabled && needleRouter) {
+    registerNeedleRouteTool(
+      server,
+      needleRouter,
+      providerRegistry,
+      config.needleMaxCatalogTools,
+    );
+  }
   if (providerRegistry) {
     // Register the stable control-plane and persisted provider schemas before
     // attempting any live provider discovery. Some MCP clients snapshot the

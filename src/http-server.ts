@@ -27,6 +27,7 @@ import { WorkspaceManager } from "./workspace.js";
 import { SandboxGuard } from "./sandbox.js";
 import type { BrowserManager } from "./browser-manager.js";
 import type { ProviderRegistry } from "./providers/provider-registry.js";
+import type { NeedleRouter } from "./needle/needle-router.js";
 
 export interface RunningHttpServer {
   httpServer: HttpServer;
@@ -77,6 +78,7 @@ export function createWsrMcpHandler(
   workspaceManager?: WorkspaceManager,
   browserManager?: BrowserManager,
   providerRegistry?: ProviderRegistry,
+  needleRouter?: NeedleRouter,
 ): McpHttpHandler {
   return createMcpHandler(
     () =>
@@ -87,6 +89,7 @@ export function createWsrMcpHandler(
         workspaceManager,
         browserManager,
         providerRegistry,
+        needleRouter,
       ),
     {
       legacy: "stateless",
@@ -104,6 +107,7 @@ export async function startHttpServer(
   workspaceManager?: WorkspaceManager,
   browserManager?: BrowserManager,
   providerRegistry?: ProviderRegistry,
+  needleRouter?: NeedleRouter,
 ): Promise<RunningHttpServer> {
   const app = express();
   app.disable("x-powered-by");
@@ -123,6 +127,7 @@ export async function startHttpServer(
           undefined,
           browserManager,
           providerRegistry,
+          needleRouter,
         ),
         workspaceManager: undefined,
       };
@@ -147,6 +152,7 @@ export async function startHttpServer(
       sessionWorkspaceManager,
       sessionBrowserManager,
       providerRegistry,
+      needleRouter,
     );
     return { server, workspaceManager: sessionWorkspaceManager };
   };
@@ -243,6 +249,7 @@ export async function startHttpServer(
       sessionWorkspaceManager,
       sessionBrowserManager,
       providerRegistry,
+      needleRouter,
     );
     const handleRequest = toNodeHandler(handler, {
       onerror: (error) => {
@@ -477,6 +484,7 @@ export async function startHttpServer(
     workspaceManager,
     browserManager,
     providerRegistry,
+    needleRouter,
   );
   const handleModernMcpRequest = toNodeHandler(mcpHandler, {
     onerror: (error) => {

@@ -52,6 +52,12 @@ export interface AppConfig {
   postgresqlMcpUrl: string | undefined;
   mcpProviderHealthIntervalMs: number;
   mcpProviderRetryIntervalMs: number;
+  needleEnabled: boolean;
+  needlePython: string;
+  needleConfidenceThreshold: number;
+  needleToolIndexPath: string;
+  needleRequestTimeoutMs: number;
+  needleMaxCatalogTools: number;
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -85,6 +91,23 @@ function parseInteger(
         ? `greater than or equal to ${minimum}`
         : `between ${minimum} and ${maximum}`;
     throw new Error(`${name} must be an integer ${range}`);
+  }
+  return parsed;
+}
+
+function parseNumber(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+  minimum: number,
+  maximum: number,
+): number {
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${name} must be a number between ${minimum} and ${maximum}`);
   }
   return parsed;
 }
@@ -240,5 +263,32 @@ export function loadConfig(
     postgresqlMcpUrl,
     mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),
     mcpProviderRetryIntervalMs: parseInteger(env.MCP_PROVIDER_RETRY_INTERVAL_MS, 5_000, "MCP_PROVIDER_RETRY_INTERVAL_MS", 1_000, 3_600_000),
+    needleEnabled: parseBoolean(env.MCP_NEEDLE_ENABLED, false),
+    needlePython: env.MCP_NEEDLE_PYTHON?.trim() || "python",
+    needleConfidenceThreshold: parseNumber(
+      env.MCP_NEEDLE_CONFIDENCE_THRESHOLD,
+      0.7,
+      "MCP_NEEDLE_CONFIDENCE_THRESHOLD",
+      0,
+      1,
+    ),
+    needleToolIndexPath: path.resolve(
+      env.MCP_NEEDLE_TOOL_INDEX_PATH?.trim() ||
+        path.join(processCwd, ".cache", "needle", "wsr-tools.idx"),
+    ),
+    needleRequestTimeoutMs: parseInteger(
+      env.MCP_NEEDLE_REQUEST_TIMEOUT_MS,
+      60_000,
+      "MCP_NEEDLE_REQUEST_TIMEOUT_MS",
+      1_000,
+      10 * 60_000,
+    ),
+    needleMaxCatalogTools: parseInteger(
+      env.MCP_NEEDLE_MAX_CATALOG_TOOLS,
+      24,
+      "MCP_NEEDLE_MAX_CATALOG_TOOLS",
+      13,
+      256,
+    ),
   };
 }

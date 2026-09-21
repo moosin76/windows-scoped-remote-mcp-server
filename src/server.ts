@@ -9,6 +9,7 @@ import { BrowserManager } from "./browser-manager.js";
 import { createProviderRegistry } from "./providers/provider-factory.js";
 import { ProviderScheduler } from "./providers/provider-scheduler.js";
 import { ensurePreferredWindowsShell } from "./shells.js";
+import { NeedleRouter } from "./needle/needle-router.js";
 
 async function main() {
   ensurePreferredWindowsShell();
@@ -83,6 +84,22 @@ async function main() {
     }
   }
 
+  const needleRouter = config.needleEnabled
+    ? new NeedleRouter({
+        enabled: true,
+        pythonCommand: config.needlePython,
+        confidenceThreshold: config.needleConfidenceThreshold,
+        toolIndexPath: config.needleToolIndexPath,
+        requestTimeoutMs: config.needleRequestTimeoutMs,
+        cwd: projectRoot,
+      })
+    : undefined;
+  if (needleRouter) {
+    console.log(
+      `[Needle] Fast Tool Router enabled (lazy local sidecar, threshold=${config.needleConfidenceThreshold})`,
+    );
+  }
+
   const fileService = new FileService({
     sandbox,
     maxChunkBytes: config.maxFileChunkBytes,
@@ -97,6 +114,7 @@ async function main() {
     workspaceManager,
     browserManager,
     providerRegistry,
+    needleRouter,
   );
   console.log(`[HTTP Server] Listening on ${config.host}:${config.port}`);
 
@@ -138,6 +156,7 @@ async function main() {
     }
     await providerScheduler.stop().catch(() => {});
     await providerRegistry.closeAll().catch(() => {});
+    await needleRouter?.close().catch(() => {});
     await browserManager.close().catch(() => {});
     await runningServer.close().catch(() => {});
     process.exit(0);
