@@ -89,3 +89,38 @@ ChatGPT / WSR (`@ezremote`)
 - `test/desktop-commander-sync.test.ts`
 
 이 변경은 Needle feature worktree에서 수정하지 않았으며 merge 시에도 보존해야 한다.
+
+
+## 재시작 후 live 확인
+
+WSR 재시작 후:
+
+- running commit: `00bb8b894a1b`
+- WSR uptime 갱신 확인
+- `.env`의 `MCP_NEEDLE_ENABLED=true` 확인
+- MCP handler `tools/list`: 31 tools, `needle_route` present
+- `needle_route` input: `query, originalQuery, scope, providerId`
+
+MCP handler 실제 호출:
+
+- `Check WSR status` → `wsr_status`
+  - confidence: 0.9777
+  - recommended: true
+  - latency: 2046ms
+- 실제 persisted Provider snapshot:
+  - total 87
+  - Blender 32
+  - PostgreSQL 9
+- `Get Blender scene information`
+  - scope=providers / providerId=blender
+  - `blender_get_scene_info`
+  - `user_prompt="Blender scene 정보 확인해"` 원문 복원 확인
+  - confidence: 1.0
+  - latency: 651ms
+- `List PostgreSQL schemas`
+  - scope=providers / providerId=postgresql
+  - `postgresql_list_schemas`
+  - confidence: 1.0
+  - latency: 482ms
+
+현재 열린 ChatGPT 대화의 connector tool schema에는 플러그인 새로고침 후에도 `needle_route`가 동적으로 추가되지 않았다. 서버 등록/동작 문제는 아니며, 현재 대화에 고정된 Tool schema cache 문제로 판단한다. 새 대화에서 최종 노출 확인이 필요하다.

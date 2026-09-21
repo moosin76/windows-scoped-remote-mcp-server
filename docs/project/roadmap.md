@@ -128,7 +128,7 @@ WSR 자체의 실행 상태를 한 번에 확인하는 read-only 진단 Tool을 
 
 ## NOW-06 — Needle Fast Tool Router PoC
 
-**상태: 구현 완료 / 실제 WSR 재시작 후 live 확인 대기**
+**상태: 구현 및 서버 live 검증 완료 / ChatGPT 현재 대화 Tool schema 갱신 확인 대기**
 
 작은 로컬 Needle 3 모델을 이용해 WSR Tool 선택과 argument extraction을 빠르게 보조하는 선택적 Decision Harness를 추가한다.
 
@@ -142,7 +142,10 @@ WSR 자체의 실행 상태를 한 번에 확인하는 read-only 진단 Tool을 
 - [x] confidence 기반 추천 상태 반환
 - [x] 단위 테스트 및 문서화
 - [x] Windows 실기기 latency/정확도 검증
-- [ ] 실제 WSR 재시작 후 ChatGPT에서 `needle_route` live 호출 확인
+- [x] WSR 재시작 후 새 commit(`00bb8b8`) 실행 확인
+- [x] MCP handler `tools/list`에서 `needle_route` 등록 확인
+- [x] MCP handler 경유 Core/Blender/PostgreSQL 실제 Needle inference 확인
+- [ ] 새 ChatGPT 대화에서 플러그인 schema가 `needle_route`를 노출하는지 최종 확인
 
 ### 완료 조건
 
