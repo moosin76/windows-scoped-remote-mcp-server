@@ -126,6 +126,30 @@ WSR 자체의 실행 상태를 한 번에 확인하는 read-only 진단 Tool을 
 
 ---
 
+## NOW-06 — Needle Fast Tool Router PoC
+
+**상태: 구현 완료 / 실제 WSR 재시작 후 live 확인 대기**
+
+작은 로컬 Needle 3 모델을 이용해 WSR Tool 선택과 argument extraction을 빠르게 보조하는 선택적 Decision Harness를 추가한다.
+
+- [x] 활용 범위와 보안 경계 설계
+- [x] 구현 계획 문서 작성
+- [x] `needle_route` 추천 전용 Tool
+- [x] Core + Provider Tool catalog adapter
+- [x] Needle Python sidecar lazy start / failure isolation
+- [x] catalog fingerprint별 persistent sidecar pool
+- [x] 영어 canonical query + `originalQuery` 정책
+- [x] confidence 기반 추천 상태 반환
+- [x] 단위 테스트 및 문서화
+- [x] Windows 실기기 latency/정확도 검증
+- [ ] 실제 WSR 재시작 후 ChatGPT에서 `needle_route` live 호출 확인
+
+### 완료 조건
+
+Needle이 설치된 Windows PC에서 WSR Core/Provider Tool 후보를 로컬로 선택하고 argument를 구조화할 수 있으며, Needle 장애/낮은 confidence가 기존 WSR 기능이나 보안 경계를 깨지 않는다. 1차 단계에서는 Needle이 Tool을 직접 실행하지 않는다.
+
+---
+
 # LATER — Core 1차 완성 이후
 
 아래 항목은 중요하지만 NOW 범위를 완료한 뒤 별도 계획으로 진행한다.

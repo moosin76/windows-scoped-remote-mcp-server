@@ -21,6 +21,50 @@ Windows Scoped Remote MCP Server
        └─ PostgreSQL Remote MCP
 ```
 
+## Needle Fast Tool Router 계층
+
+Needle 3는 Remote MCP Provider가 아니라 WSR 내부의 선택적 Decision/Fast Router 계층이다.
+
+```text
+ChatGPT / Claude
+      |
+      | canonical English routing query
+      v
+  needle_route
+      |
+      v
+NeedleRouter (TypeScript)
+      |
+      | JSONL / stdio
+      v
+catalog-fingerprint sidecar pool
+      |
+      v
+cactus-needle / Needle 3 local inference
+      |
+      v
+tool + arguments + confidence
+```
+
+`needle_route`는 추천 전용이다. 반환된 Tool을 실제로 실행하지 않으며, 실제 권한과 검증은 기존 MCP Tool handler가 그대로 담당한다.
+
+보안/운영 원칙:
+
+- 기본 비활성화(`MCP_NEEDLE_ENABLED=false`)
+- 로컬 CPU inference 우선, 원격 LLM API 사용 안 함
+- telemetry opt-out
+- 설치/모델 로드/sidecar 장애가 WSR Core 시작을 중단하지 않음
+- Provider 후보는 `ProviderRegistry.listCachedTools()` allowlisted snapshot만 사용
+- 명확한 Provider 요청은 `scope=providers + providerId`로 제한
+- Provider Tool은 lexical pre-shortlist 후 최대 5개만 Needle에 전달
+- 강한 lexical match는 1개까지 축소 가능
+- confidence threshold 미만은 `escalate=true`로 LLM reasoning에 fallback
+- Provider `user_prompt`는 Needle이 생성하지 않고 `originalQuery`에서 복원
+
+사용자 요청이 한국어여도 AI caller가 `needle_route.query`를 짧은 영어 imperative로 정규화한다. 단 workspace alias, 파일 경로, URL, branch, Blender object, DB schema/table, ID 같은 literal 값은 원문 그대로 유지한다.
+
+Needle 3 base engine의 catalog 재초기화 제약 때문에 Tool catalog가 다른 요청을 하나의 Python process에서 재초기화하지 않는다. `NeedleRouter`는 catalog fingerprint별 persistent sidecar를 제한된 LRU pool로 재사용한다.
+
 ## Provider 계층
 
 ```text
