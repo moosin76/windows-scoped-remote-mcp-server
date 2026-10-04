@@ -104,7 +104,7 @@ MCP_WINDOWS_COMMAND=uvx
 MCP_WINDOWS_TOOLS=DisplayInventory,Snapshot,Screenshot,Click,Type,Scroll,Move,Shortcut,Wait,WaitFor,MultiSelect,MultiEdit,Clipboard
 ```
 
-현재 개발 PC의 `.env`에서는 `MCP_WINDOWS_ENABLED=true`이며 `MCP_WINDOWS_COMMAND`는 로컬 `uvx.exe` 절대경로를 사용한다. 실제 사용자 경로나 비밀값은 Git에 커밋하지 않는다.
+현재 개발 PC의 `.env`에서도 `MCP_WINDOWS_COMMAND=uvx`를 사용한다. 사용자별 `uvx.exe` 절대 경로는 저장하지 않으며, `start.bat`/`start.sh`가 시작 시 `uvx` 설치 여부와 PATH를 준비한다.
 
 Provider가 Windows-MCP child process에 전달하는 환경:
 

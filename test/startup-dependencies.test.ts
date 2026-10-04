@@ -27,9 +27,18 @@ describe("startup dependency bootstrap", () => {
     expect(serverStart).toBeGreaterThan(uvInstaller);
   });
 
-  it("keeps the public Godot command portable", () => {
+  it("keeps uvx-backed provider commands portable", () => {
     const example = readFileSync(path.join(repoRoot, ".env.example"), "utf8");
-    expect(example).toContain("MCP_GODOT_COMMAND=uvx");
-    expect(example).not.toMatch(/MCP_GODOT_COMMAND=[A-Za-z]:[\\/]/);
+
+    for (const variable of [
+      "MCP_GODOT_COMMAND",
+      "MCP_BLENDER_COMMAND",
+      "MCP_WINDOWS_COMMAND",
+    ]) {
+      expect(example).toContain(`${variable}=uvx`);
+      expect(example).not.toMatch(
+        new RegExp(`^${variable}=[A-Za-z]:[\\\\/]`, "m"),
+      );
+    }
   });
 });

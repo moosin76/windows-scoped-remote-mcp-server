@@ -46,7 +46,7 @@ Blender add-on
 
 ## 로컬 설정
 
-루트 `.env`에는 Blender Provider를 활성화했다. 실제 `uvx.exe` 절대 경로는 로컬 `.env`에만 두고 Git에는 커밋하지 않는다.
+루트 `.env`에는 Blender Provider를 활성화했다. 현재 설정은 사용자별 `uvx.exe` 절대 경로를 저장하지 않고 `MCP_BLENDER_COMMAND=uvx`를 사용한다. `start.bat`/`start.sh`가 `uvx` 설치 여부와 PATH를 준비한다.
 
 Blender add-on socket `127.0.0.1:9876`이 열린 것을 확인했다.
 
