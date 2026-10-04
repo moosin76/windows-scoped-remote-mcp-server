@@ -6,7 +6,7 @@ import { createProviderRegistry } from "../src/providers/provider-factory.js";
 function baseEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    MCP_WORKSPACE_ROOT: process.cwd(),
+    MCP_WORKSPACE_ROOTS: process.cwd(),
     MCP_ALLOW_NO_AUTH: "true",
     MCP_OAUTH_ENABLED: "false",
     MCP_GODOT_ENABLED: "true",

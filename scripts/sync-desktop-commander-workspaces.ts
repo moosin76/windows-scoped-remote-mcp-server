@@ -2,6 +2,7 @@ import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from "n
 import os from "node:os";
 import path from "node:path";
 import { parse as parseDotenv } from "dotenv";
+import { loadConfiguredWorkspaceRoots } from "../src/workspace.js";
 
 function option(name: string, fallback: string) {
   const index = process.argv.indexOf(name);
@@ -25,20 +26,23 @@ if (!existsSync(configPath)) {
 }
 
 const env = parseDotenv(readFileSync(envPath));
-const rawRoots = env.MCP_WORKSPACE_ROOTS?.trim();
-if (!rawRoots) fail("MCP_WORKSPACE_ROOTS is empty or missing; existing RDC config was not changed.");
+let workspaces;
+try {
+  workspaces = loadConfiguredWorkspaceRoots(
+    env,
+    path.dirname(envPath),
+    path.dirname(envPath),
+    { createMissing: false },
+  );
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
+
 const directories: string[] = [];
 const seen = new Set<string>();
 
-for (const entry of rawRoots.split(",")) {
-  const trimmed = entry.trim();
-  const separator = trimmed.indexOf(":");
-  if (separator <= 0) continue;
-
-  const candidate = trimmed.slice(separator + 1).trim();
-  if (!candidate) continue;
-
-  const resolved = path.resolve(candidate);
+for (const workspace of workspaces) {
+  const resolved = path.resolve(workspace.path);
   try {
     if (!statSync(resolved).isDirectory()) continue;
   } catch {

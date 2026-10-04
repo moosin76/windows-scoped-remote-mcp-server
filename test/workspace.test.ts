@@ -1,5 +1,8 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseWorkspaceRoots, WorkspaceManager } from "../src/workspace.js";
+import { loadConfiguredWorkspaceRoots, parseWorkspaceRoots, WorkspaceManager } from "../src/workspace.js";
 import { SandboxGuard } from "../src/sandbox.js";
 
 describe("WorkspaceManager & Multi-Root Sandbox", () => {
@@ -45,4 +48,36 @@ describe("WorkspaceManager & Multi-Root Sandbox", () => {
 
     expect(() => sandbox.assertInside("c:\\Windows\\cmd.exe")).toThrow();
   });
+  it("loads workspace JSON and uses the first entry as active", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "wsr-workspace-file-"));
+    try {
+      const alpha = path.join(root, "alpha");
+      const beta = path.join(root, "beta");
+      mkdirSync(alpha);
+      mkdirSync(beta);
+      writeFileSync(
+        path.join(root, "workspaces.local.json"),
+        JSON.stringify({
+          workspaces: [
+            { name: "alpha", path: "./alpha" },
+            { name: "beta", path: "./beta" },
+          ],
+        }),
+      );
+
+      const roots = loadConfiguredWorkspaceRoots(
+        { MCP_WORKSPACE_FILE: "workspaces.local.json" },
+        root,
+        root,
+      );
+      const manager = new WorkspaceManager(roots);
+
+      expect(roots.map((workspace) => workspace.name)).toEqual(["alpha", "beta"]);
+      expect(manager.getActiveWorkspace().name).toBe("alpha");
+      expect(manager.getActiveWorkspace().path).toBe(path.resolve(alpha));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 });

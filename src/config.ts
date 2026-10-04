@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { normalizeCanonicalPath } from "./paths.js";
-import { parseWorkspaceRoots, type ParsedWorkspace } from "./workspace.js";
+import { loadConfiguredWorkspaceRoots, type ParsedWorkspace } from "./workspace.js";
 import { detectDefaultShell } from "./shells.js";
 
 dotenv.config();
@@ -134,10 +134,13 @@ export function loadConfig(
     env.MCP_OAUTH_APPROVAL_KEY?.trim() || authToken;
 
   const fallbackWorkspace = normalizeCanonicalPath(
-    env.MCP_WORKSPACE_ROOT?.trim() || env.MCP_DEFAULT_CWD?.trim() || processCwd,
+    env.MCP_DEFAULT_CWD?.trim() || processCwd,
   );
-  const rawWorkspaceRoots = env.MCP_WORKSPACE_ROOTS?.trim() || env.MCP_WORKSPACE_ROOT?.trim();
-  const workspaceRoots = parseWorkspaceRoots(rawWorkspaceRoots, fallbackWorkspace);
+  const workspaceRoots = loadConfiguredWorkspaceRoots(
+    env,
+    processCwd,
+    fallbackWorkspace,
+  );
   const workspaceRoot = workspaceRoots[0].path;
   const defaultCwd = workspaceRoot;
 

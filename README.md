@@ -254,11 +254,10 @@ workspace_resume(workspace="ec")
 여러 프로젝트를 하나의 WSR에서 관리할 수 있습니다.
 
 ```env
-MCP_WORKSPACE_ROOTS=game:D:\Godot\MyGame,tools:D:\project\tools,reference:D:\project\reference
-MCP_WORKSPACE_ROOT=D:\Godot\MyGame
+MCP_WORKSPACE_FILE=workspaces.local.json
 ```
 
-현재 활성 Workspace는 기본 작업 대상으로 사용하고, 다른 등록 Workspace는 교차 Workspace 기능을 통해 읽기/검색/분석/복사 중심으로 사용할 수 있습니다.
+`workspaces.example.json`을 `workspaces.local.json`으로 복사한 뒤 Workspace를 한 항목씩 등록합니다. 파일에 등록된 첫 번째 Workspace가 자동으로 활성 Workspace가 됩니다. 별도의 `MCP_WORKSPACE_ROOT` 설정은 필요하지 않습니다. 기존 `MCP_WORKSPACE_ROOTS` 한 줄 형식은 호환성을 위해 계속 지원됩니다.
 
 활성 Workspace 상태는 MCP 세션별로 독립됩니다. 따라서 서로 다른 ChatGPT 채팅에서 각각 `game`, `tools`처럼 다른 Workspace를 선택해도 `switch_workspace` 상태가 다른 채팅으로 전파되지 않습니다. MCP 2025-era는 `Mcp-Session-Id`, ChatGPT의 MCP 2026-07-28 연결은 `x-openai-session`을 기준으로 세션을 구분합니다.
 
@@ -302,6 +301,7 @@ git clone <repository-url>
 cd windows-scoped-remote-mcp-server
 npm install
 copy .env.example .env
+copy workspaces.example.json workspaces.local.json
 npm run build
 npm test
 ```
@@ -318,7 +318,7 @@ start.bat
 bash start.sh
 ```
 
-두 시작 스크립트는 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
+두 시작 스크립트는 `uvx`가 없으면 Astral 공식 설치 스크립트로 `uv`/`uvx` 설치를 시도하고, 현재 프로세스 PATH에 `%USERPROFILE%\.local\bin`을 반영합니다. 또한 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
 
 WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되어 있으면 PATH 등록 여부와 관계없이 일반적인 Git for Windows 설치 경로까지 탐색해 Git Bash를 우선 사용합니다. Git Bash를 찾지 못하면 PowerShell 7(`pwsh`)을 사용하며, PowerShell 7도 없으면 `winget`으로 설치를 시도합니다.
 
@@ -329,8 +329,8 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | 변수                              | 기본값                      | 설명                                   |
 | :-------------------------------- | :-------------------------- | :------------------------------------- |
 | `MCP_PORT`                        | `12000`                     | WSR HTTP 서버 포트                     |
-| `MCP_WORKSPACE_ROOT`              | 현재 경로                   | 활성 Workspace                         |
-| `MCP_WORKSPACE_ROOTS`             | `MCP_WORKSPACE_ROOT`        | Multi-Workspace 목록                   |
+| `MCP_WORKSPACE_FILE`              | 없음                        | Workspace JSON 파일. 첫 항목이 활성 Workspace |
+| `MCP_WORKSPACE_ROOTS`             | 현재 경로                   | 레거시 한 줄 Multi-Workspace 형식             |
 | `MCP_AUTH_TOKEN`                  | 없음                        | 인증용 토큰                            |
 | `MCP_PUBLIC_URL`                  | 없음                        | 공개 MCP URL                           |
 | `CLOUDFLARE_TUNNEL_TOKEN`         | 없음                        | Cloudflare Tunnel 토큰                 |
