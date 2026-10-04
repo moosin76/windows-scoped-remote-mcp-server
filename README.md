@@ -324,6 +324,51 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 
 ---
 
+## ChatGPT에 WSR 연결
+
+최근 ChatGPT에서는 WSR 같은 Remote MCP 서버를 먼저 **Custom MCP app**으로 등록합니다. 필요하다면 이 MCP app을 별도의 Plugin 구성에 포함할 수 있지만, WSR 자체 연결 절차는 MCP app 생성 흐름을 기준으로 설명합니다.
+
+먼저 WSR과 Cloudflare Tunnel을 실행한 상태에서 실제 MCP endpoint를 확인합니다.
+
+```text
+MCP_PUBLIC_URL=https://mcp.example.com
+MCP_ENDPOINT=/mcp
+
+ChatGPT에 입력할 MCP endpoint:
+https://mcp.example.com/mcp
+```
+
+중요: `MCP_PUBLIC_URL`은 **기본 공개 URL**이며 기본 MCP 경로 `/mcp`를 포함하지 않습니다. ChatGPT에 등록할 때는 `MCP_PUBLIC_URL + MCP_ENDPOINT`를 사용합니다. `MCP_ENDPOINT`를 따로 바꾸지 않았다면 기본값은 `/mcp`입니다.
+
+ChatGPT 쪽 등록 절차는 다음과 같습니다.
+
+1. ChatGPT의 **Settings → Apps → Create**로 이동합니다. 관리형 Workspace에서는 **Workspace Settings → Apps → Create** 경로를 사용할 수 있습니다.
+2. 계정/Workspace 정책상 필요한 경우 Developer mode를 활성화합니다. 메뉴 위치는 플랜과 Workspace 권한에 따라 **Settings → Apps → Advanced Settings** 또는 Workspace 설정에 있을 수 있습니다.
+3. 새 Custom MCP app을 만들고 이름(예: `wsr`)과 MCP endpoint를 입력합니다.
+4. 인증 방식은 **OAuth**를 선택합니다.
+5. **Scan Tools**를 실행합니다. WSR OAuth 승인 화면이 열리면 `.env`의 `MCP_AUTH_TOKEN` 값을 입력하고 승인합니다.
+6. Tool scan이 끝나면 app 생성을 완료합니다.
+
+예시:
+
+```text
+Name: wsr
+MCP endpoint: https://mcp.example.com/mcp
+Authentication: OAuth
+```
+
+Godot, Blender 등 Provider를 새로 활성화하거나 Provider 버전 변경으로 Tool 목록이 바뀌면 ChatGPT의 WSR app 설정에서 **Refresh / Scan Tools**를 다시 실행해야 합니다. ChatGPT는 승인된 MCP Tool 구성을 자동으로 즉시 갱신하지 않을 수 있습니다.
+
+연결 후에는 새 채팅에서 WSR app을 선택한 뒤 다음처럼 확인할 수 있습니다.
+
+```text
+"WSR 상태 확인해줘"              → wsr_status
+"워크스페이스 목록 확인해줘"     → list_workspaces
+"Provider 연결 상태 확인해줘"    → mcp_provider_status
+```
+
+---
+
 ## 주요 환경변수
 
 | 변수                              | 기본값                      | 설명                                   |
@@ -332,7 +377,8 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_WORKSPACE_FILE`              | 없음                        | Workspace JSON 파일. 첫 항목이 활성 Workspace |
 | `MCP_WORKSPACE_ROOTS`             | 현재 경로                   | 레거시 한 줄 Multi-Workspace 형식             |
 | `MCP_AUTH_TOKEN`                  | 없음                        | 인증용 토큰                            |
-| `MCP_PUBLIC_URL`                  | 없음                        | 공개 MCP URL                           |
+| `MCP_PUBLIC_URL`                  | 없음                        | 공개 기본 URL (`/mcp` 제외)          |
+| `MCP_ENDPOINT`                    | `/mcp`                      | ChatGPT가 연결할 MCP 경로             |
 | `CLOUDFLARE_TUNNEL_TOKEN`         | 없음                        | Cloudflare Tunnel 토큰                 |
 | `MCP_BROWSER_HEADLESS`            | `false`                     | Playwright Headless 여부               |
 | `MCP_PROVIDER_HEALTH_INTERVAL_MS` | `10000`                     | 연결된 Provider 검사 주기(ms)          |
