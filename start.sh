@@ -40,7 +40,15 @@ if [[ ! -f ".env" ]]; then
   exit 1
 fi
 
-# 3. Check if bin/cloudflared.exe exists, download automatically if missing.
+# 3. Sync Remote Desktop Commander allowlist from WSR workspaces.
+echo "[*] Syncing Desktop Commander allowed directories from MCP_WORKSPACE_ROOTS..."
+if npx --no-install tsx scripts/sync-desktop-commander-workspaces.ts; then
+  echo "[OK] Desktop Commander workspace allowlist synced."
+else
+  echo "[!] Desktop Commander workspace sync failed. Continuing WSR startup." >&2
+fi
+
+# 4. Check if bin/cloudflared.exe exists, download automatically if missing.
 CLOUDFLARED="bin/cloudflared.exe"
 CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 
@@ -71,7 +79,7 @@ if [[ ! -f "$CLOUDFLARED" ]]; then
   fi
 fi
 
-# 4. Show installed cloudflared version and check for updates.
+# 5. Show installed cloudflared version and check for updates.
 if [[ -f "$CLOUDFLARED" ]]; then
   echo "[*] Installed cloudflared version:"
   "$CLOUDFLARED" version || true
@@ -87,13 +95,13 @@ if [[ -f "$CLOUDFLARED" ]]; then
   "$CLOUDFLARED" version || true
 fi
 
-# 5. Give the long-running WSR process extra V8 heap headroom.
+# 6. Give the long-running WSR process extra V8 heap headroom.
 # Respect an explicit user-provided max-old-space-size when present.
 if [[ "${NODE_OPTIONS:-}" != *"--max-old-space-size="* ]]; then
   export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=8192"
 fi
 
-# 6. Run the server using tsx dev mode.
+# 7. Run the server using tsx dev mode.
 echo "[*] Starting MCP Server..."
 echo "[*] NODE_OPTIONS: ${NODE_OPTIONS:-<none>}"
 exec npx tsx src/server.ts
