@@ -68,12 +68,23 @@ export class BrowserManager {
       return this.state.page;
     }
 
+    // A user can close the visible Edge/Chrome window manually. In that case
+    // Playwright keeps a BrowserContext object reference, but the underlying
+    // context is already closed. Probe it before reuse and reset stale state so
+    // the same persistent profile can be launched again.
+    if (this.state.context) {
+      try {
+        this.state.context.pages();
+      } catch {
+        this.state.context = null;
+        this.state.page = null;
+      }
+    }
+
     if (!this.state.context) {
       const launchOptions = {
         headless: this.state.headless,
         viewport: { width: 1280, height: 720 },
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -104,11 +115,18 @@ export class BrowserManager {
       }
     }
 
-    const pages = this.state.context.pages();
-    if (pages.length > 0 && !pages[0].isClosed()) {
-      this.state.page = pages[0];
-    } else {
-      this.state.page = await this.state.context.newPage();
+    try {
+      const pages = this.state.context.pages();
+      if (pages.length > 0 && !pages[0].isClosed()) {
+        this.state.page = pages[0];
+      } else {
+        this.state.page = await this.state.context.newPage();
+      }
+    } catch {
+      // Context may have been closed between the probe and page selection.
+      this.state.context = null;
+      this.state.page = null;
+      return await this.getPage();
     }
 
     return this.state.page;
