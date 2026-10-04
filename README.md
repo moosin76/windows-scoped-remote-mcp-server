@@ -343,8 +343,11 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_NEEDLE_TOOL_INDEX_PATH`      | `.cache/needle/wsr-tools.idx` | Needle Tool index 기준 경로          |
 | `MCP_NEEDLE_REQUEST_TIMEOUT_MS`   | `60000`                     | Needle 요청 timeout(ms)                |
 | `MCP_NEEDLE_MAX_CATALOG_TOOLS`    | `24`                        | Needle에 전달할 전체 Tool 상한         |
-| `MCP_GODOT_ENABLED`               | `false`                     | Godot MCP Provider 활성화              |
-| `MCP_GODOT_URL`                   | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint                     |
+| `MCP_GODOT_ENABLED`               | `false`                     | Godot AI MCP Provider 활성화           |
+| `MCP_GODOT_COMMAND`               | `uvx`                       | Godot AI attach 실행용 uvx 명령        |
+| `MCP_GODOT_VERSION`               | `4.3.0`                     | Godot AI Python package 버전           |
+| `MCP_GODOT_HTTP_PORT`             | `8001`                      | Godot AI HTTP 포트                     |
+| `MCP_GODOT_WS_PORT`               | `8002`                      | Godot AI WebSocket 포트                |
 | `MCP_BLENDER_ENABLED`             | `false`                     | Blender MCP Provider 활성화            |
 | `MCP_BLENDER_COMMAND`             | `uvx`                       | Blender MCP stdio 실행 명령            |
 | `MCP_BLENDER_HOST`                | `127.0.0.1`                 | Blender add-on socket host             |

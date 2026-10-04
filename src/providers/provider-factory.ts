@@ -11,7 +11,24 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
     registry.add(new RemoteMcpProvider({
       id: "godot",
       namespace: "godot",
-      url: config.godotMcpUrl,
+      transport: "stdio",
+      command: config.godotMcpCommand,
+      args: [
+        "--link-mode",
+        "copy",
+        "--from",
+        `godot-ai==${config.godotMcpVersion}`,
+        "godot-ai",
+        "attach",
+        "--port",
+        String(config.godotMcpHttpPort),
+        "--ws-port",
+        String(config.godotMcpWsPort),
+      ],
+      env: {
+        PYTHONUTF8: "1",
+      },
+      stdioStderrMode: "warnings",
       clientName: "windows-scoped-remote-mcp-gateway",
       clientVersion: "1.0.0",
     }));

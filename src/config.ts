@@ -40,7 +40,10 @@ export interface AppConfig {
   browserUserDataDir: string;
   cloudflareTunnelToken: string | undefined;
   godotMcpEnabled: boolean;
-  godotMcpUrl: string;
+  godotMcpCommand: string;
+  godotMcpVersion: string;
+  godotMcpHttpPort: number;
+  godotMcpWsPort: number;
   blenderMcpEnabled: boolean;
   blenderMcpCommand: string;
   blenderMcpHost: string;
@@ -151,7 +154,22 @@ export function loadConfig(
 
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
   const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
-  const godotMcpUrl = env.MCP_GODOT_URL?.trim() || "http://127.0.0.1:8000/mcp";
+  const godotMcpCommand = env.MCP_GODOT_COMMAND?.trim() || "uvx";
+  const godotMcpVersion = env.MCP_GODOT_VERSION?.trim() || "4.3.0";
+  const godotMcpHttpPort = parseInteger(
+    env.MCP_GODOT_HTTP_PORT,
+    8001,
+    "MCP_GODOT_HTTP_PORT",
+    1,
+    65_535,
+  );
+  const godotMcpWsPort = parseInteger(
+    env.MCP_GODOT_WS_PORT,
+    8002,
+    "MCP_GODOT_WS_PORT",
+    1,
+    65_535,
+  );
   const blenderMcpEnabled = parseBoolean(env.MCP_BLENDER_ENABLED, false);
   const blenderMcpCommand = env.MCP_BLENDER_COMMAND?.trim() || "uvx";
   const blenderMcpHost = env.MCP_BLENDER_HOST?.trim() || "127.0.0.1";
@@ -251,7 +269,10 @@ export function loadConfig(
     ),
     cloudflareTunnelToken,
     godotMcpEnabled,
-    godotMcpUrl,
+    godotMcpCommand,
+    godotMcpVersion,
+    godotMcpHttpPort,
+    godotMcpWsPort,
     blenderMcpEnabled,
     blenderMcpCommand,
     blenderMcpHost,
