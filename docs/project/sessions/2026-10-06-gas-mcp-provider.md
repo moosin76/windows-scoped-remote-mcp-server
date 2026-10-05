@@ -56,14 +56,20 @@ GAS Desktop MCP는 Desktop 프로세스가 소유한다.
 - WSR Core 및 다른 Provider는 계속 동작
 - ProviderScheduler가 재연결을 주기적으로 시도
 
-## 미완료 / 다음 작업
+## 재시작 후 live 검증
 
-WSR 현재 실행 프로세스는 변경 전 코드로 시작되어 있으므로 한 번 재시작이 필요하다.
+사용자가 WSR 서버를 재시작한 뒤 실제 ChatGPT → ezremote → WSR Provider → GAS 경로를 검증했다.
 
-재시작 후:
+- `mcp_provider_status`: `gas` connected / toolCount 16
+- Provider catalog: `gas_project_create`부터 `gas_toolchain_health_check`까지 16개 namespace Tool 확인
+- 실제 Tool 호출: `gas_project_close`
+- 결과: `{ ok: true, data: { closed: false, reason: "NO_PROJECT_OPEN" } }`
+- 즉, WSR Provider control plane을 통한 GAS Tool 호출이 실제로 동작함을 확인했다.
 
-1. `mcp_provider_status`에서 `gas` connected / toolCount 16 확인
-2. Provider catalog에서 `gas_*` Tool 노출 확인
-3. WSR Gateway를 통해 `gas_project_close` 같은 안전한 Tool 실제 호출
-4. ChatGPT Plugin tool schema 새로고침 후 GAS namespace 노출 확인
-5. live 검증 결과를 이 문서에 추가하고 checkpoint commit
+현재 ChatGPT 세션의 정적 plugin schema에는 `gas_*` 개별 Tool이 직접 나타나지 않고, `mcp_provider_call` fallback을 통해 호출된다. Plugin 새로고침/새 세션 이후 direct dynamic Tool 노출 여부는 별도 확인한다.
+
+## 다음 작업
+
+1. GAS에서 실제 프로젝트를 연 뒤 `gas_asset_search`, `gas_job_list` 같은 read Tool 검수
+2. ChatGPT Plugin tool schema 새로고침 후 `gas_*` direct tool 노출 확인
+3. 필요하면 GAS Phase 3 사용자 최종 검수에 WSR 연동 PASS를 반영
