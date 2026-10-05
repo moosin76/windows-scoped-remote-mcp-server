@@ -44,6 +44,8 @@ function config(overrides: Partial<AppConfig> = {}): AppConfig {
     godotMcpWsPort: 8002,
     postgresqlMcpEnabled: false,
     postgresqlMcpUrl: undefined,
+    gasMcpEnabled: false,
+    gasMcpUrl: undefined,
     mcpProviderHealthIntervalMs: 10000,
     mcpProviderRetryIntervalMs: 5000,
     ...overrides,

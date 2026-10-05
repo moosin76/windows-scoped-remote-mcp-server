@@ -53,6 +53,8 @@ export interface AppConfig {
   windowsMcpTools: string[];
   postgresqlMcpEnabled: boolean;
   postgresqlMcpUrl: string | undefined;
+  gasMcpEnabled: boolean;
+  gasMcpUrl: string | undefined;
   mcpProviderHealthIntervalMs: number;
   mcpProviderRetryIntervalMs: number;
   needleEnabled: boolean;
@@ -202,6 +204,11 @@ export function loadConfig(
   if (postgresqlMcpEnabled && !postgresqlMcpUrl) {
     throw new Error("MCP_POSTGRESQL_URL is required when MCP_POSTGRESQL_ENABLED=true");
   }
+  const gasMcpEnabled = parseBoolean(env.MCP_GAS_ENABLED, false);
+  const gasMcpUrl = env.MCP_GAS_URL?.trim() || undefined;
+  if (gasMcpEnabled && !gasMcpUrl) {
+    throw new Error("MCP_GAS_URL is required when MCP_GAS_ENABLED=true");
+  }
 
   return {
     host: env.MCP_HOST?.trim() || "0.0.0.0",
@@ -285,6 +292,8 @@ export function loadConfig(
     windowsMcpTools,
     postgresqlMcpEnabled,
     postgresqlMcpUrl,
+    gasMcpEnabled,
+    gasMcpUrl,
     mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),
     mcpProviderRetryIntervalMs: parseInteger(env.MCP_PROVIDER_RETRY_INTERVAL_MS, 5_000, "MCP_PROVIDER_RETRY_INTERVAL_MS", 1_000, 3_600_000),
     needleEnabled: parseBoolean(env.MCP_NEEDLE_ENABLED, false),

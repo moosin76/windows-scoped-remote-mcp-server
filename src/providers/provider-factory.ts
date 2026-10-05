@@ -87,5 +87,15 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
       clientVersion: "1.0.0",
     }));
   }
+  if (config.gasMcpEnabled && config.gasMcpUrl) {
+    registry.add(new RemoteMcpProvider({
+      id: "gas",
+      namespace: "gas",
+      url: config.gasMcpUrl,
+      transport: "streamable-http",
+      clientName: "windows-scoped-remote-mcp-gateway",
+      clientVersion: "1.0.0",
+    }));
+  }
   return registry;
 }

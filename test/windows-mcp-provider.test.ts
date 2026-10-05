@@ -12,6 +12,7 @@ function baseEnv(): NodeJS.ProcessEnv {
     MCP_GODOT_ENABLED: "false",
     MCP_BLENDER_ENABLED: "false",
     MCP_POSTGRESQL_ENABLED: "false",
+    MCP_GAS_ENABLED: "false",
     MCP_WINDOWS_ENABLED: "false",
   };
 }

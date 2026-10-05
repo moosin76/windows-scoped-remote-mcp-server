@@ -401,6 +401,8 @@ Godot, Blender 등 Provider를 새로 활성화하거나 Provider 버전 변경�
 | `MCP_WINDOWS_ENABLED`             | `false`                     | Windows Computer Use Provider 활성화   |
 | `MCP_WINDOWS_COMMAND`             | `uvx`                       | Windows-MCP stdio 실행 명령            |
 | `MCP_WINDOWS_TOOLS`               | UI allowlist                | WSR에 노출할 Windows-MCP 도구 목록     |
+| `MCP_GAS_ENABLED`                 | `false`                     | Game Assets Studio MCP Provider 활성화 |
+| `MCP_GAS_URL`                     | `http://127.0.0.1:52214/mcp` | GAS Desktop MCP endpoint               |
 
 ### Needle 3 Fast Tool Router
 
@@ -552,6 +554,7 @@ WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재
 | Blender (ahujasid/blender-mcp) | `uvx blender-mcp` → add-on socket `127.0.0.1:9876` | stdio | 28 |
 | Windows (CursorTouch/Windows-MCP) | `uvx windows-mcp serve` | stdio | 13 (기본 allowlist) |
 | PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
+| Game Assets Studio (GAS) | `http://127.0.0.1:52214/mcp` | Streamable HTTP | 16 |
 
 PostgreSQL Provider를 활성화하려면 루트 `.env`에 다음 값을 설정합니다.
 
@@ -565,3 +568,14 @@ Docker 실행 환경은 `mcp-servers/postgres-mcp/`에 있으며 실제 `DATABAS
 PostgreSQL MCP가 제공하는 9개 도구는 WSR namespace 적용 후 `postgresql_*` 형태로 노출됩니다. 실제 연결에서는 `list_schemas`, `list_objects`, `get_object_details`, `explain_query`, `analyze_workload_indexes`, `analyze_query_indexes`, `analyze_db_health`, `get_top_queries`, `execute_sql`을 확인했습니다.
 
 자세한 설치/운영 방법은 `docs/postgresql-mcp-provider.md`와 `mcp-servers/postgres-mcp/README.md`를 참고하세요.
+
+### Game Assets Studio MCP
+
+GAS Desktop이 실행 중이면 WSR은 고정 localhost endpoint를 Streamable HTTP Provider로 연결할 수 있습니다.
+
+```env
+MCP_GAS_ENABLED=true
+MCP_GAS_URL=http://127.0.0.1:52214/mcp
+```
+
+GAS 자체 MCP는 별도 Bearer 인증 없이 `127.0.0.1`에만 바인딩됩니다. WSR에서는 Provider id/namespace 모두 `gas`를 사용하며 원격 `job_list` 같은 Tool은 `gas_job_list` 형태로 노출됩니다. GAS Desktop이 꺼져 있어도 WSR Core와 다른 Provider는 계속 동작하고 Scheduler가 주기적으로 재연결을 시도합니다.
