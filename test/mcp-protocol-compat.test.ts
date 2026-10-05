@@ -22,7 +22,7 @@ function createDependencies() {
     {
       MCP_ALLOW_NO_AUTH: "true",
       MCP_OAUTH_ENABLED: "false",
-      MCP_WORKSPACE_ROOT: workspaceRoot,
+      MCP_WORKSPACE_ROOTS: workspaceRoot,
     },
     workspaceRoot,
   );

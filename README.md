@@ -254,11 +254,10 @@ workspace_resume(workspace="ec")
 여러 프로젝트를 하나의 WSR에서 관리할 수 있습니다.
 
 ```env
-MCP_WORKSPACE_ROOTS=game:D:\Godot\MyGame,tools:D:\project\tools,reference:D:\project\reference
-MCP_WORKSPACE_ROOT=D:\Godot\MyGame
+MCP_WORKSPACE_FILE=workspaces.local.json
 ```
 
-현재 활성 Workspace는 기본 작업 대상으로 사용하고, 다른 등록 Workspace는 교차 Workspace 기능을 통해 읽기/검색/분석/복사 중심으로 사용할 수 있습니다.
+`workspaces.example.json`을 `workspaces.local.json`으로 복사한 뒤 Workspace를 한 항목씩 등록합니다. 파일에 등록된 첫 번째 Workspace가 자동으로 활성 Workspace가 됩니다. 별도의 `MCP_WORKSPACE_ROOT` 설정은 필요하지 않습니다. 기존 `MCP_WORKSPACE_ROOTS` 한 줄 형식은 호환성을 위해 계속 지원됩니다.
 
 활성 Workspace 상태는 MCP 세션별로 독립됩니다. 따라서 서로 다른 ChatGPT 채팅에서 각각 `game`, `tools`처럼 다른 Workspace를 선택해도 `switch_workspace` 상태가 다른 채팅으로 전파되지 않습니다. MCP 2025-era는 `Mcp-Session-Id`, ChatGPT의 MCP 2026-07-28 연결은 `x-openai-session`을 기준으로 세션을 구분합니다.
 
@@ -302,6 +301,7 @@ git clone <repository-url>
 cd windows-scoped-remote-mcp-server
 npm install
 copy .env.example .env
+copy workspaces.example.json workspaces.local.json
 npm run build
 npm test
 ```
@@ -318,9 +318,54 @@ start.bat
 bash start.sh
 ```
 
-두 시작 스크립트는 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
+두 시작 스크립트는 `uvx`가 없으면 Astral 공식 설치 스크립트로 `uv`/`uvx` 설치를 시도하고, 현재 프로세스 PATH에 `%USERPROFILE%\.local\bin`을 반영합니다. 또한 `bin\cloudflared.exe`가 없으면 최신 Windows 64-bit 바이너리를 내려받습니다. 바이너리가 준비된 뒤에는 현재 버전을 표시하고 `cloudflared update`로 공식 업데이트 서버를 확인합니다. 업데이트 확인이 실패해도 기존 바이너리로 WSR 시작을 계속합니다.
 
 WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되어 있으면 PATH 등록 여부와 관계없이 일반적인 Git for Windows 설치 경로까지 탐색해 Git Bash를 우선 사용합니다. Git Bash를 찾지 못하면 PowerShell 7(`pwsh`)을 사용하며, PowerShell 7도 없으면 `winget`으로 설치를 시도합니다.
+
+---
+
+## ChatGPT에 WSR 연결
+
+최근 ChatGPT에서는 WSR 같은 Remote MCP 서버를 먼저 **Custom MCP app**으로 등록합니다. 필요하다면 이 MCP app을 별도의 Plugin 구성에 포함할 수 있지만, WSR 자체 연결 절차는 MCP app 생성 흐름을 기준으로 설명합니다.
+
+먼저 WSR과 Cloudflare Tunnel을 실행한 상태에서 실제 MCP endpoint를 확인합니다.
+
+```text
+MCP_PUBLIC_URL=https://mcp.example.com
+MCP_ENDPOINT=/mcp
+
+ChatGPT에 입력할 MCP endpoint:
+https://mcp.example.com/mcp
+```
+
+중요: `MCP_PUBLIC_URL`은 **기본 공개 URL**이며 기본 MCP 경로 `/mcp`를 포함하지 않습니다. ChatGPT에 등록할 때는 `MCP_PUBLIC_URL + MCP_ENDPOINT`를 사용합니다. `MCP_ENDPOINT`를 따로 바꾸지 않았다면 기본값은 `/mcp`입니다.
+
+ChatGPT 쪽 등록 절차는 다음과 같습니다.
+
+1. ChatGPT의 **Settings → Apps → Create**로 이동합니다. 관리형 Workspace에서는 **Workspace Settings → Apps → Create** 경로를 사용할 수 있습니다.
+2. 계정/Workspace 정책상 필요한 경우 Developer mode를 활성화합니다. 메뉴 위치는 플랜과 Workspace 권한에 따라 **Settings → Apps → Advanced Settings** 또는 Workspace 설정에 있을 수 있습니다.
+3. 새 Custom MCP app을 만들고 이름(예: `wsr`)과 MCP endpoint를 입력합니다.
+4. 인증 방식은 **OAuth**를 선택합니다.
+5. **Scan Tools**를 실행합니다. WSR OAuth 승인 화면이 열리면 `.env`의 `MCP_AUTH_TOKEN` 값을 입력하고 승인합니다.
+6. Tool scan이 끝나면 app 생성을 완료합니다.
+
+예시:
+
+```text
+Name: wsr
+MCP endpoint: https://mcp.example.com/mcp
+Authentication: OAuth
+```
+
+Godot, Blender 등 Provider를 새로 활성화하거나 Provider 버전 변경으로 Tool 목록이 바뀌면 ChatGPT의 WSR app 설정에서 **Refresh / Scan Tools**를 다시 실행해야 합니다. ChatGPT는 승인된 MCP Tool 구성을 자동으로 즉시 갱신하지 않을 수 있습니다.
+
+연결 후에는 새 채팅에서 WSR app을 선택한 뒤 다음처럼 확인할 수 있습니다.
+
+```text
+"WSR 상태 확인해줘"              → wsr_status
+"워크스페이스 목록 확인해줘"     → list_workspaces
+"Provider 연결 상태 확인해줘"    → mcp_provider_status
+```
 
 ---
 
@@ -329,10 +374,11 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | 변수                              | 기본값                      | 설명                                   |
 | :-------------------------------- | :-------------------------- | :------------------------------------- |
 | `MCP_PORT`                        | `12000`                     | WSR HTTP 서버 포트                     |
-| `MCP_WORKSPACE_ROOT`              | 현재 경로                   | 활성 Workspace                         |
-| `MCP_WORKSPACE_ROOTS`             | `MCP_WORKSPACE_ROOT`        | Multi-Workspace 목록                   |
+| `MCP_WORKSPACE_FILE`              | 없음                        | Workspace JSON 파일. 첫 항목이 활성 Workspace |
+| `MCP_WORKSPACE_ROOTS`             | 현재 경로                   | 레거시 한 줄 Multi-Workspace 형식             |
 | `MCP_AUTH_TOKEN`                  | 없음                        | 인증용 토큰                            |
-| `MCP_PUBLIC_URL`                  | 없음                        | 공개 MCP URL                           |
+| `MCP_PUBLIC_URL`                  | 없음                        | 공개 기본 URL (`/mcp` 제외)          |
+| `MCP_ENDPOINT`                    | `/mcp`                      | ChatGPT가 연결할 MCP 경로             |
 | `CLOUDFLARE_TUNNEL_TOKEN`         | 없음                        | Cloudflare Tunnel 토큰                 |
 | `MCP_BROWSER_HEADLESS`            | `false`                     | Playwright Headless 여부               |
 | `MCP_PROVIDER_HEALTH_INTERVAL_MS` | `10000`                     | 연결된 Provider 검사 주기(ms)          |
@@ -343,8 +389,11 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_NEEDLE_TOOL_INDEX_PATH`      | `.cache/needle/wsr-tools.idx` | Needle Tool index 기준 경로          |
 | `MCP_NEEDLE_REQUEST_TIMEOUT_MS`   | `60000`                     | Needle 요청 timeout(ms)                |
 | `MCP_NEEDLE_MAX_CATALOG_TOOLS`    | `24`                        | Needle에 전달할 전체 Tool 상한         |
-| `MCP_GODOT_ENABLED`               | `false`                     | Godot MCP Provider 활성화              |
-| `MCP_GODOT_URL`                   | `http://127.0.0.1:8000/mcp` | Godot MCP endpoint                     |
+| `MCP_GODOT_ENABLED`               | `false`                     | Godot AI MCP Provider 활성화           |
+| `MCP_GODOT_COMMAND`               | `uvx`                       | Godot AI attach 실행용 uvx 명령        |
+| `MCP_GODOT_VERSION`               | `4.3.0`                     | Godot AI Python package 버전           |
+| `MCP_GODOT_HTTP_PORT`             | `8001`                      | Godot AI HTTP 포트                     |
+| `MCP_GODOT_WS_PORT`               | `8002`                      | Godot AI WebSocket 포트                |
 | `MCP_BLENDER_ENABLED`             | `false`                     | Blender MCP Provider 활성화            |
 | `MCP_BLENDER_COMMAND`             | `uvx`                       | Blender MCP stdio 실행 명령            |
 | `MCP_BLENDER_HOST`                | `127.0.0.1`                 | Blender add-on socket host             |
@@ -352,6 +401,8 @@ WSR의 Windows 기본 셸은 자동으로 선택됩니다. Git Bash가 설치되
 | `MCP_WINDOWS_ENABLED`             | `false`                     | Windows Computer Use Provider 활성화   |
 | `MCP_WINDOWS_COMMAND`             | `uvx`                       | Windows-MCP stdio 실행 명령            |
 | `MCP_WINDOWS_TOOLS`               | UI allowlist                | WSR에 노출할 Windows-MCP 도구 목록     |
+| `MCP_GAS_ENABLED`                 | `false`                     | Game Assets Studio MCP Provider 활성화 |
+| `MCP_GAS_URL`                     | `http://127.0.0.1:52214/mcp` | GAS Desktop MCP endpoint               |
 
 ### Needle 3 Fast Tool Router
 
@@ -503,6 +554,7 @@ WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재
 | Blender (ahujasid/blender-mcp) | `uvx blender-mcp` → add-on socket `127.0.0.1:9876` | stdio | 28 |
 | Windows (CursorTouch/Windows-MCP) | `uvx windows-mcp serve` | stdio | 13 (기본 allowlist) |
 | PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
+| Game Assets Studio (GAS) | `http://127.0.0.1:52214/mcp` | Streamable HTTP | 16 |
 
 PostgreSQL Provider를 활성화하려면 루트 `.env`에 다음 값을 설정합니다.
 
@@ -516,3 +568,14 @@ Docker 실행 환경은 `mcp-servers/postgres-mcp/`에 있으며 실제 `DATABAS
 PostgreSQL MCP가 제공하는 9개 도구는 WSR namespace 적용 후 `postgresql_*` 형태로 노출됩니다. 실제 연결에서는 `list_schemas`, `list_objects`, `get_object_details`, `explain_query`, `analyze_workload_indexes`, `analyze_query_indexes`, `analyze_db_health`, `get_top_queries`, `execute_sql`을 확인했습니다.
 
 자세한 설치/운영 방법은 `docs/postgresql-mcp-provider.md`와 `mcp-servers/postgres-mcp/README.md`를 참고하세요.
+
+### Game Assets Studio MCP
+
+GAS Desktop이 실행 중이면 WSR은 고정 localhost endpoint를 Streamable HTTP Provider로 연결할 수 있습니다.
+
+```env
+MCP_GAS_ENABLED=true
+MCP_GAS_URL=http://127.0.0.1:52214/mcp
+```
+
+GAS 자체 MCP는 별도 Bearer 인증 없이 `127.0.0.1`에만 바인딩됩니다. WSR에서는 Provider id/namespace 모두 `gas`를 사용하며 원격 `job_list` 같은 Tool은 `gas_job_list` 형태로 노출됩니다. GAS Desktop이 꺼져 있어도 WSR Core와 다른 Provider는 계속 동작하고 Scheduler가 주기적으로 재연결을 시도합니다.

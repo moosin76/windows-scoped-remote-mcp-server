@@ -1,0 +1,12 @@
+{
+  "workspaces": [
+    {
+      "name": "main",
+      "path": "C:/path/to/your/project"
+    },
+    {
+      "name": "reference",
+      "path": "C:/path/to/reference-project"
+    }
+  ]
+}

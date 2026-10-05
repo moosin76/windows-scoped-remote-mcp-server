@@ -49,13 +49,9 @@ MCP_BLENDER_HOST=127.0.0.1
 MCP_BLENDER_PORT=9876
 ```
 
-Windows에서 WSR 프로세스의 `PATH`에 `uvx`가 없다면 `MCP_BLENDER_COMMAND`에 실행 파일의 절대 경로를 지정할 수 있다.
+`MCP_BLENDER_COMMAND`는 사용자별 절대 경로 대신 `uvx` 명령 이름을 사용한다. `start.bat`와 `start.sh`가 시작 시 `uvx`를 확인하고 없으면 Astral uv 설치를 시도한 뒤 `%USERPROFILE%\.local\bin`을 현재 프로세스 `PATH`에 반영한다.
 
-```env
-MCP_BLENDER_COMMAND=C:/Users/<user>/.local/bin/uvx.exe
-```
-
-실제 사용자 경로나 인증정보는 `.env.example`에 넣지 않는다.
+따라서 `.env`와 `.env.example`에는 사용자 홈 디렉터리나 `uvx.exe`의 절대 경로를 저장하지 않는다.
 
 ## Provider 등록
 

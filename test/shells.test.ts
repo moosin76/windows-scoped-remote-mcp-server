@@ -30,7 +30,7 @@ describe("shell selection", () => {
     const config = loadConfig(
       {
         ...process.env,
-        MCP_WORKSPACE_ROOT: cwd,
+        MCP_WORKSPACE_ROOTS: cwd,
         MCP_ALLOW_NO_AUTH: "true",
         MCP_OAUTH_ENABLED: "false",
         MCP_DEFAULT_SHELL: "cmd",

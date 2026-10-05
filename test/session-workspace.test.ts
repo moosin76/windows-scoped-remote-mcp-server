@@ -57,7 +57,6 @@ describe("session-scoped workspace", () => {
       {
         MCP_ALLOW_NO_AUTH: "true",
         MCP_OAUTH_ENABLED: "false",
-        MCP_WORKSPACE_ROOT: alpha,
         MCP_WORKSPACE_ROOTS: `alpha:${alpha},beta:${beta}`,
       },
       root,
@@ -147,7 +146,6 @@ describe("session-scoped workspace", () => {
       {
         MCP_ALLOW_NO_AUTH: "true",
         MCP_OAUTH_ENABLED: "false",
-        MCP_WORKSPACE_ROOT: alpha,
         MCP_WORKSPACE_ROOTS: `alpha:${alpha},beta:${beta}`,
       },
       root,
@@ -234,7 +232,6 @@ describe("session-scoped workspace", () => {
       {
         MCP_ALLOW_NO_AUTH: "true",
         MCP_OAUTH_ENABLED: "false",
-        MCP_WORKSPACE_ROOT: alpha,
         MCP_WORKSPACE_ROOTS: `alpha:${alpha}`,
       },
       root,
@@ -309,7 +306,6 @@ describe("session-scoped workspace", () => {
       {
         MCP_ALLOW_NO_AUTH: "true",
         MCP_OAUTH_ENABLED: "false",
-        MCP_WORKSPACE_ROOT: alpha,
         MCP_WORKSPACE_ROOTS: `alpha:${alpha}`,
       },
       root,

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { normalizeCanonicalPath } from "./paths.js";
 
@@ -20,81 +20,141 @@ export interface ParsedWorkspace {
  * - "d:\Godot\mcp-test, d:\Godot\ether-chronicle"
  * - Semicolon or comma separators
  */
-export function parseWorkspaceRoots(
-  rawRoots: string | undefined,
+function workspaceItemsToParsed(
+  items: string[],
   fallbackRoot: string,
+  createMissing = true,
 ): ParsedWorkspace[] {
   const list: ParsedWorkspace[] = [];
   const usedNames = new Set<string>();
 
-  if (rawRoots && rawRoots.trim() !== "") {
-    // Split by comma or semicolon
-    const items = rawRoots.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+  for (const item of items) {
+    let name: string;
+    let targetPath: string;
 
-    for (const item of items) {
-      let name: string;
-      let targetPath: string;
+    const colonIndex = item.indexOf(":");
+    const secondColonIndex = item.indexOf(":", colonIndex + 1);
 
-      // Check for alias syntax (e.g. "alias:C:\path" or "alias:D:/path")
-      // Need to distinguish "test:D:\path" vs "D:\path" (Windows drive letter)
-      const colonIndex = item.indexOf(":");
-      const secondColonIndex = item.indexOf(":", colonIndex + 1);
-
-      if (colonIndex > 0 && secondColonIndex > colonIndex) {
-        // Form: "alias:D:\path"
-        name = item.slice(0, colonIndex).trim();
-        targetPath = item.slice(colonIndex + 1).trim();
-      } else if (colonIndex > 0 && !/^[a-zA-Z]$/.test(item.slice(0, colonIndex).trim())) {
-        // Form: "alias:/posix/path" or "alias:relative/path"
-        name = item.slice(0, colonIndex).trim();
-        targetPath = item.slice(colonIndex + 1).trim();
-      } else {
-        // Form: "D:\path" or "/posix/path" -> derive name from directory basename
-        targetPath = item;
-        const normalized = normalizeCanonicalPath(targetPath);
-        name = path.basename(normalized) || "root";
-      }
-
-      const canonicalPath = normalizeCanonicalPath(targetPath);
-      
-      // Auto create directory if not exists
-      try {
-        if (!existsSync(canonicalPath)) {
-          mkdirSync(canonicalPath, { recursive: true });
-        }
-      } catch {}
-
-      // Ensure unique name
-      let uniqueName = name;
-      let counter = 1;
-      while (usedNames.has(uniqueName.toLowerCase())) {
-        uniqueName = `${name}-${counter++}`;
-      }
-      usedNames.add(uniqueName.toLowerCase());
-
-      list.push({
-        name: uniqueName,
-        path: canonicalPath,
-      });
+    if (colonIndex > 0 && secondColonIndex > colonIndex) {
+      name = item.slice(0, colonIndex).trim();
+      targetPath = item.slice(colonIndex + 1).trim();
+    } else if (colonIndex > 0 && !/^[a-zA-Z]$/.test(item.slice(0, colonIndex).trim())) {
+      name = item.slice(0, colonIndex).trim();
+      targetPath = item.slice(colonIndex + 1).trim();
+    } else {
+      targetPath = item;
+      const normalized = normalizeCanonicalPath(targetPath);
+      name = path.basename(normalized) || "root";
     }
+
+    const canonicalPath = normalizeCanonicalPath(targetPath);
+    try {
+      if (createMissing && !existsSync(canonicalPath)) {
+        mkdirSync(canonicalPath, { recursive: true });
+      }
+    } catch {}
+
+    let uniqueName = name;
+    let counter = 1;
+    while (usedNames.has(uniqueName.toLowerCase())) {
+      uniqueName = `${name}-${counter++}`;
+    }
+    usedNames.add(uniqueName.toLowerCase());
+    list.push({ name: uniqueName, path: canonicalPath });
   }
 
-  // If list is empty, use fallback
   if (list.length === 0) {
     const canonical = normalizeCanonicalPath(fallbackRoot);
     try {
-      if (!existsSync(canonical)) {
+      if (createMissing && !existsSync(canonical)) {
         mkdirSync(canonical, { recursive: true });
       }
     } catch {}
-    const defaultName = path.basename(canonical) || "workspace";
     list.push({
-      name: defaultName,
+      name: path.basename(canonical) || "workspace",
       path: canonical,
     });
   }
 
   return list;
+}
+
+/**
+ * Parses workspace definitions from the legacy environment string.
+ * The first entry is the initial active workspace.
+ */
+export function parseWorkspaceRoots(
+  rawRoots: string | undefined,
+  fallbackRoot: string,
+): ParsedWorkspace[] {
+  const items = rawRoots && rawRoots.trim() !== ""
+    ? rawRoots.split(/[,;]+/).map((value) => value.trim()).filter(Boolean)
+    : [];
+  return workspaceItemsToParsed(items, fallbackRoot);
+}
+
+/**
+ * Loads workspaces from MCP_WORKSPACE_FILE when configured.
+ * Falls back to MCP_WORKSPACE_ROOTS for backward compatibility.
+ * The first configured workspace is always the initial active workspace.
+ */
+export function loadConfiguredWorkspaceRoots(
+  env: NodeJS.ProcessEnv,
+  baseDir: string,
+  fallbackRoot: string,
+  options: { createMissing?: boolean } = {},
+): ParsedWorkspace[] {
+  const createMissing = options.createMissing ?? true;
+  const workspaceFile = env.MCP_WORKSPACE_FILE?.trim();
+  if (!workspaceFile) {
+    const items = env.MCP_WORKSPACE_ROOTS?.trim()
+      ? env.MCP_WORKSPACE_ROOTS.split(/[,;]+/).map((value) => value.trim()).filter(Boolean)
+      : [];
+    return workspaceItemsToParsed(items, fallbackRoot, createMissing);
+  }
+
+  const filePath = path.resolve(baseDir, workspaceFile);
+  if (!existsSync(filePath)) {
+    throw new Error(`MCP_WORKSPACE_FILE not found: ${filePath}`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(filePath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `MCP_WORKSPACE_FILE is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const entries = Array.isArray(parsed)
+    ? parsed
+    : typeof parsed === "object" && parsed !== null
+      ? (parsed as { workspaces?: unknown }).workspaces
+      : undefined;
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error("MCP_WORKSPACE_FILE must contain a non-empty 'workspaces' array.");
+  }
+
+  const items = entries.map((entry, index) => {
+    if (typeof entry !== "object" || entry === null) {
+      throw new Error(`MCP_WORKSPACE_FILE workspaces[${index}] must be an object.`);
+    }
+    const { name, path: workspacePath } = entry as { name?: unknown; path?: unknown };
+    if (typeof name !== "string" || name.trim() === "") {
+      throw new Error(`MCP_WORKSPACE_FILE workspaces[${index}].name is required.`);
+    }
+    if (typeof workspacePath !== "string" || workspacePath.trim() === "") {
+      throw new Error(`MCP_WORKSPACE_FILE workspaces[${index}].path is required.`);
+    }
+    const normalizedPath = path.isAbsolute(workspacePath.trim())
+      ? workspacePath.trim()
+      : path.resolve(path.dirname(filePath), workspacePath.trim());
+    return `${name.trim()}:${normalizedPath}`;
+  });
+
+  return workspaceItemsToParsed(items, fallbackRoot, createMissing);
 }
 
 export class WorkspaceManager {

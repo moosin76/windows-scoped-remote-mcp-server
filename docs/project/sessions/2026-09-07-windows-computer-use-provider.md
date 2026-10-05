@@ -73,7 +73,7 @@ WSR Core와 중복되는 시스템 기능은 WSR의 Sandbox/Workspace 경계를 
   - `WINDOWS_MCP_DISABLE_FLASH=1`
   - stdio stderr는 warnings-only
 - `.env.example` Windows Provider 섹션 추가
-- 로컬 `.env`에서 Provider 활성화 및 로컬 `uvx.exe` 절대 경로 설정
+- 로컬 `.env`에서 Provider 활성화, 실행 명령은 사용자별 절대 경로 대신 `MCP_WINDOWS_COMMAND=uvx` 사용
 - `test/windows-mcp-provider.test.ts` 추가
 - README / MCP gateway architecture / roadmap 업데이트
 - `docs/windows-computer-use-provider.md` 추가

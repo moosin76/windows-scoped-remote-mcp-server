@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { normalizeCanonicalPath } from "./paths.js";
-import { parseWorkspaceRoots, type ParsedWorkspace } from "./workspace.js";
+import { loadConfiguredWorkspaceRoots, type ParsedWorkspace } from "./workspace.js";
 import { detectDefaultShell } from "./shells.js";
 
 dotenv.config();
@@ -40,7 +40,10 @@ export interface AppConfig {
   browserUserDataDir: string;
   cloudflareTunnelToken: string | undefined;
   godotMcpEnabled: boolean;
-  godotMcpUrl: string;
+  godotMcpCommand: string;
+  godotMcpVersion: string;
+  godotMcpHttpPort: number;
+  godotMcpWsPort: number;
   blenderMcpEnabled: boolean;
   blenderMcpCommand: string;
   blenderMcpHost: string;
@@ -50,6 +53,8 @@ export interface AppConfig {
   windowsMcpTools: string[];
   postgresqlMcpEnabled: boolean;
   postgresqlMcpUrl: string | undefined;
+  gasMcpEnabled: boolean;
+  gasMcpUrl: string | undefined;
   mcpProviderHealthIntervalMs: number;
   mcpProviderRetryIntervalMs: number;
   needleEnabled: boolean;
@@ -131,10 +136,13 @@ export function loadConfig(
     env.MCP_OAUTH_APPROVAL_KEY?.trim() || authToken;
 
   const fallbackWorkspace = normalizeCanonicalPath(
-    env.MCP_WORKSPACE_ROOT?.trim() || env.MCP_DEFAULT_CWD?.trim() || processCwd,
+    env.MCP_DEFAULT_CWD?.trim() || processCwd,
   );
-  const rawWorkspaceRoots = env.MCP_WORKSPACE_ROOTS?.trim() || env.MCP_WORKSPACE_ROOT?.trim();
-  const workspaceRoots = parseWorkspaceRoots(rawWorkspaceRoots, fallbackWorkspace);
+  const workspaceRoots = loadConfiguredWorkspaceRoots(
+    env,
+    processCwd,
+    fallbackWorkspace,
+  );
   const workspaceRoot = workspaceRoots[0].path;
   const defaultCwd = workspaceRoot;
 
@@ -151,7 +159,22 @@ export function loadConfig(
 
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
   const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
-  const godotMcpUrl = env.MCP_GODOT_URL?.trim() || "http://127.0.0.1:8000/mcp";
+  const godotMcpCommand = env.MCP_GODOT_COMMAND?.trim() || "uvx";
+  const godotMcpVersion = env.MCP_GODOT_VERSION?.trim() || "4.3.0";
+  const godotMcpHttpPort = parseInteger(
+    env.MCP_GODOT_HTTP_PORT,
+    8001,
+    "MCP_GODOT_HTTP_PORT",
+    1,
+    65_535,
+  );
+  const godotMcpWsPort = parseInteger(
+    env.MCP_GODOT_WS_PORT,
+    8002,
+    "MCP_GODOT_WS_PORT",
+    1,
+    65_535,
+  );
   const blenderMcpEnabled = parseBoolean(env.MCP_BLENDER_ENABLED, false);
   const blenderMcpCommand = env.MCP_BLENDER_COMMAND?.trim() || "uvx";
   const blenderMcpHost = env.MCP_BLENDER_HOST?.trim() || "127.0.0.1";
@@ -180,6 +203,11 @@ export function loadConfig(
   const postgresqlMcpUrl = env.MCP_POSTGRESQL_URL?.trim() || undefined;
   if (postgresqlMcpEnabled && !postgresqlMcpUrl) {
     throw new Error("MCP_POSTGRESQL_URL is required when MCP_POSTGRESQL_ENABLED=true");
+  }
+  const gasMcpEnabled = parseBoolean(env.MCP_GAS_ENABLED, false);
+  const gasMcpUrl = env.MCP_GAS_URL?.trim() || undefined;
+  if (gasMcpEnabled && !gasMcpUrl) {
+    throw new Error("MCP_GAS_URL is required when MCP_GAS_ENABLED=true");
   }
 
   return {
@@ -251,7 +279,10 @@ export function loadConfig(
     ),
     cloudflareTunnelToken,
     godotMcpEnabled,
-    godotMcpUrl,
+    godotMcpCommand,
+    godotMcpVersion,
+    godotMcpHttpPort,
+    godotMcpWsPort,
     blenderMcpEnabled,
     blenderMcpCommand,
     blenderMcpHost,
@@ -261,6 +292,8 @@ export function loadConfig(
     windowsMcpTools,
     postgresqlMcpEnabled,
     postgresqlMcpUrl,
+    gasMcpEnabled,
+    gasMcpUrl,
     mcpProviderHealthIntervalMs: parseInteger(env.MCP_PROVIDER_HEALTH_INTERVAL_MS, 10_000, "MCP_PROVIDER_HEALTH_INTERVAL_MS", 1_000, 3_600_000),
     mcpProviderRetryIntervalMs: parseInteger(env.MCP_PROVIDER_RETRY_INTERVAL_MS, 5_000, "MCP_PROVIDER_RETRY_INTERVAL_MS", 1_000, 3_600_000),
     needleEnabled: parseBoolean(env.MCP_NEEDLE_ENABLED, false),

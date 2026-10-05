@@ -32,7 +32,42 @@ if not exist ".env" (
     exit /b 1
 )
 
-:: 3. Check if bin\cloudflared.exe exists, download automatically if missing
+:: 3. Ensure uvx is available for local stdio MCP providers such as Godot AI.
+:: The official uv installer places uv/uvx in %%USERPROFILE%%\.local\bin by default.
+if exist "%USERPROFILE%\.local\bin\uvx.exe" set "PATH=%USERPROFILE%\.local\bin;%PATH%"
+
+where uvx >nul 2>&1
+if errorlevel 1 (
+    echo [*] uvx not found. Installing Astral uv...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://astral.sh/uv/install.ps1 | iex"
+    if errorlevel 1 (
+        echo [!] Failed to install Astral uv/uvx.
+        pause
+        exit /b 1
+    )
+    if exist "%USERPROFILE%\.local\bin\uvx.exe" set "PATH=%USERPROFILE%\.local\bin;%PATH%"
+)
+
+where uvx >nul 2>&1
+if errorlevel 1 (
+    echo [!] uvx is still unavailable after installation.
+    echo     Restart the terminal or add %%USERPROFILE%%\.local\bin to PATH.
+    pause
+    exit /b 1
+)
+echo [OK] uvx is available:
+uvx --version
+
+:: 4. Sync Remote Desktop Commander allowlist from WSR workspace configuration.
+echo [*] Syncing Desktop Commander allowed directories from WSR workspace configuration...
+call npx --no-install tsx scripts/sync-desktop-commander-workspaces.ts
+if errorlevel 1 (
+    echo [!] Desktop Commander workspace sync failed. Continuing WSR startup.
+) else (
+    echo [OK] Desktop Commander workspace allowlist synced.
+)
+
+:: 5. Check if bin\cloudflared.exe exists, download automatically if missing
 if not exist "bin\cloudflared.exe" (
     echo [*] bin\cloudflared.exe not found. Downloading latest Cloudflare Tunnel binary...
     if not exist "bin" mkdir "bin"
@@ -44,7 +79,7 @@ if not exist "bin\cloudflared.exe" (
     )
 )
 
-:: 4. Show installed cloudflared version and check for updates
+:: 6. Show installed cloudflared version and check for updates
 if exist "bin\cloudflared.exe" (
     echo [*] Installed cloudflared version:
     "bin\cloudflared.exe" version
@@ -59,12 +94,12 @@ if exist "bin\cloudflared.exe" (
     "bin\cloudflared.exe" version
 )
 
-:: 5. Give the long-running WSR process extra V8 heap headroom.
+:: 7. Give the long-running WSR process extra V8 heap headroom.
 :: Respect an explicit user-provided max-old-space-size when present.
 echo %NODE_OPTIONS% | findstr /C:"--max-old-space-size=" >nul
 if errorlevel 1 set "NODE_OPTIONS=%NODE_OPTIONS% --max-old-space-size=8192"
 
-:: 6. Run Server using tsx dev mode
+:: 8. Run Server using tsx dev mode
 echo [*] Starting MCP Server...
 echo [*] NODE_OPTIONS: %NODE_OPTIONS%
 call npx tsx src/server.ts
