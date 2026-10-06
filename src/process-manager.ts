@@ -235,7 +235,11 @@ export class ProcessManager {
     if (pid && process.platform === "win32") {
       try {
         // Kill the whole process tree forcefully on Windows
-        await execFileAsync("taskkill", ["/PID", pid.toString(), "/T", "/F"]);
+        await execFileAsync(
+          "taskkill",
+          ["/PID", pid.toString(), "/T", "/F"],
+          { windowsHide: true },
+        );
       } catch {
         try {
           managed.child.kill(signal);

@@ -11,6 +11,8 @@ export interface ShellInvocation {
   args: string[];
 }
 
+let cachedDefaultGitBashExecutable: string | null | undefined;
+
 function findCommandsOnPath(command: string): string[] {
   if (process.platform !== "win32") return [];
 
@@ -24,6 +26,15 @@ function findCommandsOnPath(command: string): string[] {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function isKnownNonGitWindowsBash(candidate: string): boolean {
+  if (process.platform !== "win32") return false;
+  const normalized = path.resolve(candidate).replace(/\//g, "\\").toLowerCase();
+  return (
+    normalized.endsWith("\\windows\\system32\\bash.exe") ||
+    normalized.includes("\\windowsapps\\bash.exe")
+  );
 }
 
 function uniqueExistingPaths(candidates: Array<string | undefined>): string[] {
@@ -46,11 +57,12 @@ function gitBashCandidates(
   env: NodeJS.ProcessEnv = process.env,
   includePath = true,
 ): string[] {
-  const candidates: Array<string | undefined> = includePath
-    ? [...findCommandsOnPath("bash")]
-    : [];
+  const candidates: Array<string | undefined> = [];
 
-  // If git.exe is on PATH, derive the adjacent Git for Windows bash paths.
+  // Prefer Git-derived paths before generic PATH bash entries. On recent
+  // Windows installs, `where bash` can return WSL's System32 bash.exe before
+  // Git Bash. Probing that executable can launch WSL transiently, which is
+  // unnecessary for exec_command and can disturb foreground focus.
   for (const gitExe of includePath ? findCommandsOnPath("git") : []) {
     const gitDir = path.dirname(gitExe);
     const gitRoot = path.basename(gitDir).toLowerCase() === "cmd"
@@ -88,6 +100,14 @@ function gitBashCandidates(
     );
   }
 
+  if (includePath) {
+    candidates.push(
+      ...findCommandsOnPath("bash").filter(
+        (candidate) => !isKnownNonGitWindowsBash(candidate),
+      ),
+    );
+  }
+
   return uniqueExistingPaths(candidates);
 }
 
@@ -106,6 +126,11 @@ export function findGitBashExecutable(
 ): string | undefined {
   if (process.platform !== "win32") return undefined;
 
+  const useDefaultCache = env === process.env && includePath;
+  if (useDefaultCache && cachedDefaultGitBashExecutable !== undefined) {
+    return cachedDefaultGitBashExecutable ?? undefined;
+  }
+
   for (const candidate of gitBashCandidates(env, includePath)) {
     const probe = spawnSync(candidate, ["-lc", "uname -s"], {
       encoding: "utf8",
@@ -116,10 +141,16 @@ export function findGitBashExecutable(
 
     const platformName = probe.stdout.trim();
     if (/^(MINGW|MSYS|CYGWIN)/i.test(platformName)) {
+      if (useDefaultCache) {
+        cachedDefaultGitBashExecutable = candidate;
+      }
       return candidate;
     }
   }
 
+  if (useDefaultCache) {
+    cachedDefaultGitBashExecutable = null;
+  }
   return undefined;
 }
 
