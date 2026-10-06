@@ -545,17 +545,36 @@ export async function startHttpServer(
         req.header("mcp-protocol-version") || req.body?.params?.protocolVersion || "";
       const isLegacyProtocol = !requestedProtocol.startsWith("2026-");
 
-      console.log(
-        `[MCP Inbound] ${displayName} from ${req.ip}${sessionId ? ` session=${sessionId}` : ""}`,
-      );
-
       const openAiSessionId = req.header("x-openai-session") || undefined;
-      console.log(
-        `[MCP Diagnostic] protocol=${requestedProtocol || "unknown"} openaiSession=${openAiSessionId ? "present" : "absent"}`,
-      );
-      res.once("finish", () => {
-        console.log(`[MCP Outbound] ${res.statusCode} ${displayName}`);
-      });
+      if (config.mcpRequestLogging && toolName) {
+        const requestStartedAt = process.hrtime.bigint();
+        res.once("finish", () => {
+          const toolArgs = req.body?.params?.arguments;
+          const explicitWorkspace =
+            typeof toolArgs?.workspace === "string"
+              ? toolArgs.workspace
+              : toolName === "switch_workspace" && typeof toolArgs?.name === "string"
+                ? toolArgs.name
+                : undefined;
+          const requestWorkspace =
+            explicitWorkspace ||
+            (sessionId ? legacySessions.get(sessionId)?.workspaceManager.getActiveWorkspace().name : undefined) ||
+            (openAiSessionId
+              ? modernSessions.get(openAiSessionId)?.workspaceManager.getActiveWorkspace().name
+              : undefined) ||
+            workspaceManager?.getActiveWorkspace().name ||
+            "default";
+          const now = new Date();
+          const timestamp = [now.getHours(), now.getMinutes(), now.getSeconds()]
+            .map((value) => String(value).padStart(2, "0"))
+            .join(":");
+          const durationMs = Math.max(
+            0,
+            Math.round(Number(process.hrtime.bigint() - requestStartedAt) / 1_000_000),
+          );
+          console.log(`${timestamp} - ${requestWorkspace} - ${displayName} - ${durationMs}ms`);
+        });
+      }
 
       try {
         if (isLegacyProtocol) {

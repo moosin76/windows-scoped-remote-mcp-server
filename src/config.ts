@@ -34,6 +34,7 @@ export interface AppConfig {
   maxProcesses: number;
   modernSessionRetentionMs: number;
   maxModernSessions: number;
+  mcpRequestLogging: boolean;
   maxFileChunkBytes: number;
   maxEditFileBytes: number;
   browserHeadless: boolean;
@@ -271,6 +272,7 @@ export function loadConfig(
       1,
       1024,
     ),
+    mcpRequestLogging: parseBoolean(env.MCP_REQUEST_LOGGING, true),
     maxFileChunkBytes: parseInteger(env.MCP_MAX_FILE_CHUNK_BYTES, 4 * 1024 * 1024, "MCP_MAX_FILE_CHUNK_BYTES", 4096),
     maxEditFileBytes: parseInteger(env.MCP_MAX_EDIT_FILE_BYTES, 128 * 1024 * 1024, "MCP_MAX_EDIT_FILE_BYTES", 4096),
     browserHeadless: parseBoolean(env.MCP_BROWSER_HEADLESS, false),
