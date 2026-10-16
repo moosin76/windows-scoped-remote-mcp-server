@@ -56,6 +56,8 @@ describe("Godot AI MCP v4.3 provider config", () => {
     expect(provider.transportType).toBe("stdio");
     expect(provider.command).toBe("uvx-test");
     expect(provider.args).toEqual([
+      "--python",
+      "3.12",
       "--link-mode",
       "copy",
       "--from",

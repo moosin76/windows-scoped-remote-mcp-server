@@ -14,6 +14,7 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
       transport: "stdio",
       command: config.godotMcpCommand,
       args: [
+        "--python", "3.12",
         "--link-mode",
         "copy",
         "--from",
