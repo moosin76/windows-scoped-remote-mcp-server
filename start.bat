@@ -7,6 +7,22 @@ echo ============================================================
 echo   Starting Windows Scoped Remote MCP Server
 echo ============================================================
 
+:: 0. Windows setup checks. System-wide installs are never silent.
+where node >nul 2>&1
+if errorlevel 1 (
+    echo [!] Node.js 24+ is required. Install it from https://nodejs.org/
+    echo [!] Or run: winget install --id OpenJS.NodeJS.LTS -e
+    pause
+    exit /b 1
+)
+node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 24 ? 0 : 1)"
+if errorlevel 1 (
+    echo [!] Node.js 24 or newer is required.
+    pause
+    exit /b 1
+)
+if exist "%USERPROFILE%\.local\bin\uv.exe" set "PATH=%USERPROFILE%\.local\bin;%PATH%"
+
 :: 1. Check if node_modules exists, install if missing
 if not exist "node_modules" (
     echo [*] Installing dependencies...
@@ -57,6 +73,13 @@ if errorlevel 1 (
 )
 echo [OK] uvx is available:
 uvx --version
+
+:: 3a. Check machine dependencies and prepare isolated MCP Python.
+node scripts\preflight.mjs --fix
+if errorlevel 1 (
+    echo [!] Some optional dependencies require attention; check above.
+    echo [!] WSR will continue; affected MCP providers may remain unavailable.
+)
 
 :: 4. Sync Remote Desktop Commander allowlist from WSR workspace configuration.
 echo [*] Syncing Desktop Commander allowed directories from WSR workspace configuration...
