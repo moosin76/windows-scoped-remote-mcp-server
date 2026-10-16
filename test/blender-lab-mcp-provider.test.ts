@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { loadConfig } from "../src/config.js";
 import { createProviderRegistry } from "../src/providers/provider-factory.js";
@@ -32,7 +33,7 @@ describe("Blender Lab official MCP provider", () => {
     expect(config.blenderMcpPort).toBe(9876);
   });
 
-  it("registers pinned Blender Lab stdio with Python 3.12 and official socket environment", () => {
+  it("registers Blender Lab stdio with the validated Python selection", () => {
     const env = blenderEnv();
     env.MCP_BLENDER_COMMAND = "uvx-test";
     env.MCP_BLENDER_VERSION = "1.0.3";
@@ -55,7 +56,7 @@ describe("Blender Lab official MCP provider", () => {
     expect(provider.transportType).toBe("stdio");
     expect(provider.command).toBe("uvx-test");
     expect(provider.args).toEqual([
-      "--python", "3.12",
+      ...(JSON.parse(readFileSync(".mcp-python-selection.json", "utf8")).blender ? ["--python", JSON.parse(readFileSync(".mcp-python-selection.json", "utf8")).blender] : []),
       "--no-build-package", "pyyaml",
       "--link-mode", "copy",
       "--from", "git+https://projects.blender.org/lab/blender_mcp.git@v1.0.3#subdirectory=mcp",
