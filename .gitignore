@@ -54,3 +54,7 @@ tmp_docs/
 /tmp/
 /.mcp_tmp_scripts/
 /nul
+/.mcp-python-selection.json
+/.mcp-python-selection.json.tmp-*
+/.godot-mcp-version.json
+/.godot-mcp-version.json.tmp-*
