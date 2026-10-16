@@ -1,8 +1,10 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import dotenv from "dotenv";
+import { updateGodotVersion } from "./godot-version.mjs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-if (existsSync(".env") && typeof process.loadEnvFile === "function") process.loadEnvFile(".env");
+if (existsSync(".env")) dotenv.config({ path: ".env", override: true });
 const fix = process.argv.includes("--fix");
 let issues = 0;
 const report = (kind, message) => console.log("[preflight][" + kind + "] " + message);
@@ -40,9 +42,11 @@ if (uv) {
   } else need("MCP Python 3.12", false, "Run preflight with --fix");
   if (fix && (process.env.MCP_GODOT_ENABLED || "").toLowerCase() === "true") {
     report("INFO", "Preparing Godot AI MCP dependencies for Python 3.12");
-    const version = process.env.MCP_GODOT_VERSION || "4.3.0";
-    const check = run(uv, ["tool", "run", "--python", "3.12", "--link-mode", "copy", "--from", "godot-ai==" + version, "godot-ai", "--version"], { timeout: 240000, env: { ...process.env, PYTHONUTF8: "1" } });
-    need("Godot MCP " + version, check.ok, check.error || check.output.slice(-500));
+    const setting = process.env.MCP_GODOT_VERSION || "auto";
+    try {
+      const version = await updateGodotVersion({ uv, setting });
+      report("OK", "Godot MCP selected version: " + version);
+    } catch (e) { need("Godot MCP update", false, e.message); }
   }
 }
 report("INFO", "Rust/Cargo and C++ build tools are not installed proactively: Python wheels should be used where available");

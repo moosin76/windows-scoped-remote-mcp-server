@@ -54,3 +54,5 @@ tmp_docs/
 /tmp/
 /.mcp_tmp_scripts/
 /nul
+/.godot-mcp-version.json
+/.godot-mcp-version.json.tmp-*

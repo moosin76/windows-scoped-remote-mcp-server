@@ -1,5 +1,13 @@
 import dotenv from "dotenv";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+
+function loadVerifiedGodotVersion(): string {
+  try {
+    const state = JSON.parse(readFileSync(".godot-mcp-version.json", "utf8")) as { version?: string };
+    if (state.version && /^\d+\.\d+\.\d+(?:\.\d+)?$/.test(state.version)) return state.version;
+  } catch { /* use bundled fallback until preflight succeeds */ }
+  return "4.3.0";
+}
 import path from "node:path";
 import { normalizeCanonicalPath } from "./paths.js";
 import { loadConfiguredWorkspaceRoots, type ParsedWorkspace } from "./workspace.js";
@@ -162,7 +170,10 @@ export function loadConfig(
   const cloudflareTunnelToken = env.CLOUDFLARE_TUNNEL_TOKEN?.trim() || undefined;
   const godotMcpEnabled = parseBoolean(env.MCP_GODOT_ENABLED, false);
   const godotMcpCommand = env.MCP_GODOT_COMMAND?.trim() || "uvx";
-  const godotMcpVersion = env.MCP_GODOT_VERSION?.trim() || "4.3.0";
+  const godotVersionSetting = env.MCP_GODOT_VERSION?.trim() || "auto";
+  const godotMcpVersion = godotVersionSetting === "auto"
+    ? loadVerifiedGodotVersion()
+    : godotVersionSetting;
   const godotMcpHttpPort = parseInteger(
     env.MCP_GODOT_HTTP_PORT,
     8001,
