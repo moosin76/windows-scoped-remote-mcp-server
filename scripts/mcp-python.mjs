@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, renameSync } from "node:fs";
 const FILE=".mcp-python-selection.json";
 export function selected(name){try{return JSON.parse(readFileSync(FILE,"utf8"))[name]||""}catch{return ""}}
 const call=(uv,args,timeout=90000)=>spawnSync(uv,args,{encoding:"utf8",timeout,windowsHide:true,env:{...process.env,PYTHONUTF8:"1"}});
-const versions=output=>[...new Set([...String(output||"").matchAll(/cpython-(\d+\.\d+)(?:\.\d+)?-windows-/g)].map(x=>x[1]))].sort((a,b)=>Number(b.split(".")[0])-Number(a.split(".")[0])||Number(b.split(".")[1])-Number(a.split(".")[1]));
+const versions=output=>[...new Set(String(output||"").split(/\r?\n/).filter(line=>/^cpython-\d+\.\d+\.\d+-windows-/.test(line)).map(line=>line.match(/^cpython-(\d+\.\d+)\./)?.[1]).filter(Boolean))].sort((a,b)=>Number(b.split(".")[0])-Number(a.split(".")[0])||Number(b.split(".")[1])-Number(a.split(".")[1]));
 export function candidates(uv){return versions(call(uv,["python","list","--only-installed"],12000).stdout)}
 export function verify(uv,name,from,bin,{allowInstall=false}={}){
  const installed=candidates(uv);
