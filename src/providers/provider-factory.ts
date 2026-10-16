@@ -40,10 +40,21 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
         namespace: "blender",
         transport: "stdio",
         command: config.blenderMcpCommand,
-        args: ["blender-mcp"],
+        args: [
+          "--python", "3.12",
+          "--link-mode", "copy",
+          "--from",
+          `git+https://projects.blender.org/lab/blender_mcp.git@v${config.blenderMcpVersion}#subdirectory=mcp`,
+          "blender-mcp",
+          "--transport", "stdio",
+        ],
         env: {
-          BLENDER_HOST: config.blenderMcpHost,
-          BLENDER_PORT: String(config.blenderMcpPort),
+          BLENDER_MCP_HOST: config.blenderMcpHost,
+          BLENDER_MCP_PORT: String(config.blenderMcpPort),
+          // uvx resolves the official Git source; Windows needs PATHEXT to find git.exe.
+          ...(process.platform === "win32"
+            ? { PATHEXT: process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD" }
+            : {}),
         },
         stdioStderrMode: "warnings",
         clientName: "windows-scoped-remote-mcp-gateway",

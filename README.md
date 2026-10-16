@@ -396,6 +396,7 @@ Godot, Blender 등 Provider를 새로 활성화하거나 Provider 버전 변경�
 | `MCP_GODOT_WS_PORT`               | `8002`                      | Godot AI WebSocket 포트                |
 | `MCP_BLENDER_ENABLED`             | `false`                     | Blender MCP Provider 활성화            |
 | `MCP_BLENDER_COMMAND`             | `uvx`                       | Blender MCP stdio 실행 명령            |
+| `MCP_BLENDER_VERSION`             | `1.0.3`                     | Blender Lab 공식 MCP 서버 버전         |
 | `MCP_BLENDER_HOST`                | `127.0.0.1`                 | Blender add-on socket host             |
 | `MCP_BLENDER_PORT`                | `9876`                      | Blender add-on socket port             |
 | `MCP_WINDOWS_ENABLED`             | `false`                     | Windows Computer Use Provider 활성화   |
@@ -505,26 +506,21 @@ WSR은 개발 자동화를 위해 강력한 기능을 제공하므로 다음 원
 
 MIT License
 
-## Blender MCP
+## Blender Lab 공식 MCP
 
-WSR은 Blender MCP를 local stdio Provider로 실행합니다. Blender의 `9876` 포트는 MCP HTTP endpoint가 아니라 Blender add-on의 TCP socket이므로, WSR이 `uvx blender-mcp` 프로세스를 시작하고 그 프로세스가 add-on socket에 연결하는 구조입니다.
+WSR은 Blender Lab **공식 MCP** 서버를 로컬 stdio Provider로 실행합니다. Blender의 Preferences → Get Extensions에서 Blender Lab 저장소의 `MCP` 확장 기능을 설치하고 활성화합니다. Blender 확장 기능의 `9876` 소켓은 MCP HTTP 엔드포인트가 아닙니다. WSR은 공식 Python MCP 서버를 stdio로 실행하여 이 소켓에 연결합니다.
 
-Blender add-on을 최신 상태로 설치한 뒤 Blender에서 add-on을 다시 활성화하거나 Blender를 재시작하고 **Start MCP Server**를 누릅니다.
-
-```bash
-uvx blender-mcp install-addon
-```
-
-루트 `.env` 설정 예:
+Blender 확장 기능 Preferences에서 `Server is running`을 확인하고, `uvx` 및 Python 3.12를 준비한 뒤 루트 `.env`를 설정합니다.
 
 ```env
 MCP_BLENDER_ENABLED=true
 MCP_BLENDER_COMMAND=uvx
+MCP_BLENDER_VERSION=1.0.3
 MCP_BLENDER_HOST=127.0.0.1
 MCP_BLENDER_PORT=9876
 ```
 
-연결된 Blender 도구는 WSR에서 `blender_*` namespace로 노출됩니다. 설치, 구조, 진단 절차는 `docs/blender-mcp-provider.md`를 참고하세요.
+공식 MCP 서버는 `https://projects.blender.org/lab/blender_mcp`의 `v1.0.3` 소스를 `uvx --python 3.12`로 실행합니다. 소켓 통신 환경변수는 `BLENDER_MCP_HOST`, `BLENDER_MCP_PORT`입니다. 연결된 도구는 `blender_*` namespace로 노출됩니다. 자세한 내용은 `docs/blender-mcp-provider.md`를 참고하세요.
 
 ---
 
@@ -551,7 +547,7 @@ WSR은 Remote MCP Provider별로 transport를 선택할 수 있습니다. 현재
 | Provider | Endpoint | Transport | Tools |
 | --- | --- | --- | ---: |
 | Godot | `http://127.0.0.1:8000/mcp` | Streamable HTTP | 45 |
-| Blender (ahujasid/blender-mcp) | `uvx blender-mcp` → add-on socket `127.0.0.1:9876` | stdio | 28 |
+| Blender Lab 공식 MCP 1.0.3 | `uvx --python 3.12` → 공식 소켓 `127.0.0.1:9876` | stdio | 26 |
 | Windows (CursorTouch/Windows-MCP) | `uvx windows-mcp serve` | stdio | 13 (기본 allowlist) |
 | PostgreSQL (CrystalDBA postgres-mcp) | `http://127.0.0.1:10021/sse` | legacy SSE | 9 |
 | Game Assets Studio (GAS) | `http://127.0.0.1:52214/mcp` | Streamable HTTP | 16 |

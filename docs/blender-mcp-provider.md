@@ -1,99 +1,59 @@
-# Blender MCP Provider
+# Blender Lab 공식 MCP Provider
 
 ## 목적
 
-WSR에서 `ahujasid/blender-mcp`를 선택적 Provider로 연결하고 Blender 편집 기능을 `blender_*` namespace로 노출한다.
+WSR에서 **Blender Lab 공식 MCP**를 `blender_*` 이름으로 연결한다. 기존 커뮤니티 `ahujasid/blender-mcp`와 다른 제품이므로 두 애드온을 혼용하지 않는다.
+
+- Blender 확장 기능: Blender Lab `MCP` (검증 버전 1.0.3)
+- 서버 소스: https://projects.blender.org/lab/blender_mcp
+- 공식 MCP 서버: Git 태그 `v1.0.3`의 `mcp/` Python 프로젝트
+- 실행: `uvx --python 3.12 --link-mode copy --from "git+https://projects.blender.org/lab/blender_mcp.git@v1.0.3#subdirectory=mcp" blender-mcp --transport stdio`
+- Blender 기본 소켓: `127.0.0.1:9876`
 
 ## 연결 구조
 
-Blender add-on의 기본 `9876` 포트는 MCP HTTP endpoint가 아니다. Blender 내부 add-on이 여는 TCP socket이며, 실제 MCP server는 별도 stdio 프로세스로 실행된다.
-
 ```text
-ChatGPT / MCP Client
-        ↓
-       WSR
-        ↓ stdio
-  uvx blender-mcp
-        ↓ TCP socket
-127.0.0.1:9876
-        ↓
- Blender MCP Add-on
-        ↓
-     Blender
+ChatGPT → WSR Gateway → StdioClientTransport
+                         → uvx (Python 3.12, Blender Lab 공식 MCP)
+                         → Blender Lab 애드온 TCP socket 127.0.0.1:9876
+                         → Blender
 ```
 
-따라서 `http://127.0.0.1:9876/mcp` 같은 URL을 WSR Provider endpoint로 사용하지 않는다. WSR은 `StdioClientTransport`로 `uvx blender-mcp`를 실행하고 `BLENDER_HOST`, `BLENDER_PORT`를 자식 프로세스에 전달한다.
+`9876`은 **Blender 애드온 소켓 포트**이지 MCP HTTP 엔드포인트가 아니다. WSR의 `MCP_BLENDER_HOST` / `MCP_BLENDER_PORT`는 공식 서버 프로세스의 `BLENDER_MCP_HOST` / `BLENDER_MCP_PORT`로 전달한다. `--host` / `--port` 명령줄 옵션은 공식 서버의 별도 HTTP transport에 해당하므로 소켓 연결 설정과 혼동하지 않는다.
 
-## Blender add-on 설치/업데이트
+## 설치와 설정
 
-```bash
-uvx blender-mcp install-addon
-```
-
-설치 후 Blender에서 다음 중 하나를 수행한다.
-
-1. Preferences → Add-ons에서 `Interface: MCP for Blender`를 disable 후 enable
-2. 또는 Blender 재시작
-3. Blender MCP 패널에서 **Start MCP Server** 클릭
-
-기본 포트는 `9876`이다.
-
-## WSR 설정
-
-루트 `.env`에 다음 값을 설정한다.
+1. Blender `Edit → Preferences → Get Extensions`에서 Blender Lab Extensions 저장소(`https://lab.blender.org/`)를 등록하고, 공식 `MCP` 확장 기능을 설치·활성화한다.
+2. 애드온 Preferences에서 `Host: localhost`, `Port: 9876`, `Server is running`을 확인한다. Auto Start를 사용할 수 있다.
+3. uv/uvx 및 Python 3.12를 설치한다. `uv python install 3.12` 명령을 사용할 수 있다.
+4. WSR 루트 `.env`에 아래 값을 사용한다.
 
 ```env
 MCP_BLENDER_ENABLED=true
 MCP_BLENDER_COMMAND=uvx
+MCP_BLENDER_VERSION=1.0.3
 MCP_BLENDER_HOST=127.0.0.1
 MCP_BLENDER_PORT=9876
 ```
 
-`MCP_BLENDER_COMMAND`는 사용자별 절대 경로 대신 `uvx` 명령 이름을 사용한다. `start.bat`와 `start.sh`가 시작 시 `uvx`를 확인하고 없으면 Astral uv 설치를 시도한 뒤 `%USERPROFILE%\.local\bin`을 현재 프로세스 `PATH`에 반영한다.
+`MCP_BLENDER_VERSION`은 설치된 공식 Blender Lab 애드온 버전과 맞춰 지정한다. 공식 태그 버전이 실제 저장소에 존재해야 한다. WSR은 특정 사용자 계정 경로를 저장하지 않으며 시작 스크립트에서 `uvx` 실행 가능 여부를 확인한다. 공식 서버의 Python을 3.12로 고정하여 Python 3.15 등 신규 릴리스에서 wheel 부재로 빌드 실패하는 문제를 방지한다.
 
-따라서 `.env`와 `.env.example`에는 사용자 홈 디렉터리나 `uvx.exe`의 절대 경로를 저장하지 않는다.
+## 검증
 
-## Provider 등록
+- Blender를 연 상태에서 공식 애드온의 `Server is running` 확인
+- WSR Provider 상태 `blender.connected=true` 확인
+- `blender_get_objects_summary` 호출, 장면 오브젝트 표시 확인
+- 공식 MCP v1.0.3은 2026-10-16 테스트에서 **26개 도구**를 반환했다. 예전 커뮤니티 MCP의 28개 도구와 이름/기능이 다르다.
+- WSR Provider Registry는 정상 연결 시 `tools/list`를 다시 가져와 저장된 도구 스냅샷을 갱신한다.
+- Blender 애드온을 종료한 뒤 기존 도구 호출이 실패해도 WSR 본체는 유지되어야 하며 재시작 시 Provider가 자동 복구되어야 한다.
+- 로컬에서 읽기 검증 후 ChatGPT 원격 MCP 도구 목록 새로고침을 수행한다.
 
-`src/providers/provider-factory.ts`는 Blender가 활성화되면 다음 의미의 Provider를 등록한다.
+## 실제 연결 검증 (2026-10-16)
 
-```ts
-new RemoteMcpProvider({
-  id: "blender",
-  namespace: "blender",
-  transport: "stdio",
-  command: config.blenderMcpCommand,
-  args: ["blender-mcp"],
-  env: {
-    BLENDER_HOST: config.blenderMcpHost,
-    BLENDER_PORT: String(config.blenderMcpPort),
-  },
-});
-```
+Windows 11 / Blender 5.2 / Blender Lab 공식 MCP 1.0.3에서 `uvx --python 3.12`로 공식 stdio 서버를 시작하고 SDK `Client.listTools()`가 26개 도구를 돌려주는 것을 확인했다. `get_objects_summary` 읽기 호출에서는 `Scene` 및 `Camera`, `Cube`, `Light`가 반환되었다. WSR 서버 재시작 후 `mcp_provider_status`에서 Blender Provider 연결 및 26개 도구가 확인되었고, `mcp_provider_call(blender_get_objects_summary)`를 통해 실제 장면 조회도 성공했다. Blender 프로그램을 종료하면 공식 MCP 서버가 연결되어 있어도 애드온 소켓(9876)은 닫혀 장면 조회가 실패한다. 이 경우 Blender를 실행하고 애드온 서버를 시작하면 된다.
 
-Blender MCP가 제공하는 `get_scene_info` 같은 tool은 WSR에서 `blender_get_scene_info`로 노출된다.
+## 주의
 
-## 장애 격리와 재연결
+공식 MCP는 `execute_blender_code` 등 Blender 내부에서 Python을 실행하는 강력한 도구를 제공한다. WSR의 접근 제어를 유지하고 신뢰할 수 있는 클라이언트만 사용한다. `main` 병합 및 다른 프로젝트 수정은 별도 지시가 없는 한 하지 않는다.
 
-Blender나 add-on socket이 실행되지 않아도 WSR Core는 계속 실행된다. Provider 연결 실패는 `ProviderRegistry`/`ProviderScheduler`가 unavailable 상태로 관리하며 이후 재연결을 시도한다.
-
-stdio MCP child process가 종료되거나 통신 오류가 발생하면 해당 Provider 연결을 끊고 다음 재연결 시 새 `uvx blender-mcp` 프로세스를 시작한다.
-
-## 검증 기준
-
-구현 시 다음을 확인한다.
-
-- stdio fake MCP에 `connect → tools/list → tools/call → close` 성공
-- `MCP_BLENDER_ENABLED=false`에서 WSR 정상 동작
-- Blender add-on socket `127.0.0.1:9876` 연결 가능
-- 실제 `uvx blender-mcp`에서 `tools/list` 성공
-- tool이 `blender_*` namespace로 노출
-- 읽기 전용 tool인 `get_scene_info` 호출 성공
-- Blender 종료 시 WSR Core가 종료되지 않음
-- Blender 재실행 후 Scheduler가 Provider를 복구
-
-## 2026-09-07 초기 연결 확인
-
-개발 PC에서 `127.0.0.1:9876` socket이 열린 상태를 확인했고, WSR이 사용하는 Node MCP SDK의 `StdioClientTransport`로 `uvx blender-mcp`를 실행하여 실제 Blender 연결 및 `tools/list`를 확인했다. 당시 28개 tool이 반환되었다.
-
-초기 smoke test에서 설치된 Blender add-on protocol이 오래되었다는 경고가 확인되어 `uvx blender-mcp install-addon`으로 add-on 파일을 업데이트했다. 업데이트된 add-on 코드를 Blender가 실제로 로드하려면 add-on disable/enable 또는 Blender 재시작 후 **Start MCP Server**가 필요하다.
+공식 소스: https://projects.blender.org/lab/blender_mcp

@@ -47,6 +47,7 @@ export interface AppConfig {
   godotMcpWsPort: number;
   blenderMcpEnabled: boolean;
   blenderMcpCommand: string;
+  blenderMcpVersion: string;
   blenderMcpHost: string;
   blenderMcpPort: number;
   windowsMcpEnabled: boolean;
@@ -178,6 +179,7 @@ export function loadConfig(
   );
   const blenderMcpEnabled = parseBoolean(env.MCP_BLENDER_ENABLED, false);
   const blenderMcpCommand = env.MCP_BLENDER_COMMAND?.trim() || "uvx";
+  const blenderMcpVersion = env.MCP_BLENDER_VERSION?.trim() || "1.0.3";
   const blenderMcpHost = env.MCP_BLENDER_HOST?.trim() || "127.0.0.1";
   const blenderMcpPort = parseInteger(
     env.MCP_BLENDER_PORT,
@@ -287,6 +289,7 @@ export function loadConfig(
     godotMcpWsPort,
     blenderMcpEnabled,
     blenderMcpCommand,
+    blenderMcpVersion,
     blenderMcpHost,
     blenderMcpPort,
     windowsMcpEnabled,
