@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import dotenv from "dotenv";
 import { updateGodotVersion } from "./godot-version.mjs";
+import { candidates, verify, selected } from "./mcp-python.mjs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -33,20 +34,30 @@ if (process.platform === "win32") {
   }
 }
 if (uv) {
-  const py = run(uv, ["python", "find", "3.12"]);
-  if (py.ok) report("OK", "MCP Python 3.12: " + py.output.split(/\r?\n/)[0]);
-  else if (fix) {
-    report("INFO", "Installing isolated Python 3.12 with uv");
-    const result = run(uv, ["python", "install", "3.12"], { timeout: 240000 });
-    need("MCP Python 3.12", result.ok, "uv python install 3.12 failed: " + (result.error || result.output));
-  } else need("MCP Python 3.12", false, "Run preflight with --fix");
+  let installed = candidates(uv);
+  if (!installed.length && fix) {
+    report("INFO", "Installing uv-managed default Python (no version pin)");
+    const installedPython = run(uv, ["python", "install"], { timeout: 240000 });
+    if (!installedPython.ok) report("WARN", installedPython.error || installedPython.output);
+    installed = candidates(uv);
+  }
+  need("uv-managed Python candidates", installed.length > 0, "Run uv python install");
+  if (installed.length) report("INFO", "Available Python interpreters: " + installed.join(", "));
   if (fix && (process.env.MCP_GODOT_ENABLED || "").toLowerCase() === "true") {
-    report("INFO", "Preparing Godot AI MCP dependencies for Python 3.12");
+    report("INFO", "Selecting compatible Godot MCP Python without source builds");
     const setting = process.env.MCP_GODOT_VERSION || "auto";
     try {
       const version = await updateGodotVersion({ uv, setting });
-      report("OK", "Godot MCP selected version: " + version);
+      const check = verify(uv, "godot", "godot-ai==" + version, "godot-ai", { allowInstall: true });
+      need("Godot MCP Python selection", check.ok, check.error);
+      if (check.ok) report("OK", "Godot MCP " + version + " using Python " + check.python);
     } catch (e) { need("Godot MCP update", false, e.message); }
+  }
+  if (fix && (process.env.MCP_BLENDER_ENABLED || "").toLowerCase() === "true") {
+    const version = process.env.MCP_BLENDER_VERSION || "1.0.3";
+    const check = verify(uv, "blender", "git+https://projects.blender.org/lab/blender_mcp.git@v" + version + "#subdirectory=mcp", "blender-mcp", { allowInstall: true });
+    need("Blender MCP Python selection", check.ok, check.error);
+    if (check.ok) report("OK", "Blender MCP using Python " + check.python);
   }
 }
 report("INFO", "Rust/Cargo and C++ build tools are not installed proactively: Python wheels should be used where available");

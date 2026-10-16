@@ -1,4 +1,11 @@
 import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+function mcpPython(name: string): string {
+  try {
+    const value = (JSON.parse(readFileSync(".mcp-python-selection.json", "utf8")) as Record<string, string>)[name];
+    return /^\d+\.\d+$/.test(value || "") ? value : "";
+  } catch { return ""; }
+}
 import { RemoteMcpProvider } from "./mcp-provider.js";
 import { ProviderRegistry } from "./provider-registry.js";
 import type { AppConfig } from "../config.js";
@@ -14,7 +21,8 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
       transport: "stdio",
       command: config.godotMcpCommand,
       args: [
-        "--python", "3.12",
+        ...(mcpPython("godot") ? ["--python", mcpPython("godot")] : []),
+        "--no-build",
         "--link-mode",
         "copy",
         "--from",
@@ -42,7 +50,8 @@ export function createProviderRegistry(config: AppConfig): ProviderRegistry {
         transport: "stdio",
         command: config.blenderMcpCommand,
         args: [
-          "--python", "3.12",
+          ...(mcpPython("blender") ? ["--python", mcpPython("blender")] : []),
+          "--no-build-package", "pyyaml",
           "--link-mode", "copy",
           "--from",
           `git+https://projects.blender.org/lab/blender_mcp.git@v${config.blenderMcpVersion}#subdirectory=mcp`,

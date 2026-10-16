@@ -58,6 +58,7 @@ describe("Godot AI MCP v4.3 provider config", () => {
     expect(provider.args).toEqual([
       "--python",
       "3.12",
+      "--no-build",
       "--link-mode",
       "copy",
       "--from",

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import https from "node:https";
-import { spawnSync } from "node:child_process";
+import { verify } from "./mcp-python.mjs";
 const FILE = join(process.cwd(), ".godot-mcp-version.json");
 export const validVersion = v => /^\d+\.\d+\.\d+(?:\.\d+)?$/.test(v);
 export function readState() {
@@ -31,9 +31,9 @@ export async function updateGodotVersion({uv,setting="auto",force=false,now=Date
     } catch(e){logger("[preflight][WARN] Godot update check failed; preserving "+current+": "+e.message);}
   }
   if(candidate!==current || !state?.verified || setting!=="auto"){
-    const result=spawnSync(uv,["tool","run","--python","3.12","--link-mode","copy","--from","godot-ai=="+candidate,"godot-ai","--version"],{encoding:"utf8",timeout:120000,windowsHide:true,env:{...process.env,PYTHONUTF8:"1"}});
-    if(result.status!==0){logger("[preflight][WARN] Candidate "+candidate+" failed; preserving "+current+": "+String(result.stderr||result.error||"").slice(-350));candidate=current;}
-    else logger("[preflight][OK] Godot MCP "+candidate+" verified");
+    const result=verify(uv,"godot","godot-ai=="+candidate,"godot-ai");
+    if(!result.ok){logger("[preflight][WARN] Candidate "+candidate+" failed; preserving "+current+": "+result.error);candidate=current;}
+    else logger("[preflight][OK] Godot MCP "+candidate+" verified with Python "+result.python);
   }
   if(setting==="auto"){
     const next={version:candidate,verified:true,checkedAt:now};
