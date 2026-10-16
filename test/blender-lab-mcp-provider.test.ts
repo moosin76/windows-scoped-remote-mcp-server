@@ -56,6 +56,7 @@ describe("Blender Lab official MCP provider", () => {
     expect(provider.command).toBe("uvx-test");
     expect(provider.args).toEqual([
       "--python", "3.12",
+      "--no-build-package", "pyyaml",
       "--link-mode", "copy",
       "--from", "git+https://projects.blender.org/lab/blender_mcp.git@v1.0.3#subdirectory=mcp",
       "blender-mcp",
